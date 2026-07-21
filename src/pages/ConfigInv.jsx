@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 
 export default function ConfigInv({ invForm, setInvForm, mostrarAlerta, cargarTodo, supabase, lista }) {
   
-  // ESTADOS: Para almacenar las listas dinámicas de parámetros
   const [listaProductos, setListaProductos] = useState([]);
   const [listaCalidades, setListaCalidades] = useState([]); 
+  const [tabTabla, setTabTabla] = useState('activos'); // 'activos' o 'archivados'
+  const [busqueda, setBusqueda] = useState('');
 
-  // Al abrir la pantalla, disparamos la lectura de tus configuraciones vivas en Supabase
   useEffect(() => {
     obtenerParametrosConfigurados();
   }, []);
 
-  // --- Consulta productos y calidades en paralelo ---
   const obtenerParametrosConfigurados = async () => {
     try {
       const [resProd, resCal] = await Promise.all([
@@ -28,7 +29,6 @@ export default function ConfigInv({ invForm, setInvForm, mostrarAlerta, cargarTo
       setListaProductos(productosObtenidos);
       setListaCalidades(calidadesObtenidas);
 
-      // Inyectamos valores por defecto automáticos en el formulario si están vacíos
       setInvForm(prev => ({
         ...prev,
         cultivo: prev.cultivo || productosObtenidos[0]?.nombre_producto || '',
@@ -37,11 +37,10 @@ export default function ConfigInv({ invForm, setInvForm, mostrarAlerta, cargarTo
 
     } catch (err) {
       console.error("Error obteniendo parámetros para invernaderos:", err);
-      mostrarAlerta("No se pudieron cargar las configuraciones de cultivo y calidades", "error");
+      mostrarAlerta("No se pudieron cargar las configuraciones", "error");
     }
   };
 
-  // --- CARGAR DATOS EN EL FORMULARIO PARA EDICIÓN EXACTA ---
   const prepararEdicionInvernadero = (item) => {
     let estadoDB = String(item.state || item.estado || 'ACTIVO')
       .toUpperCase()
@@ -49,14 +48,13 @@ export default function ConfigInv({ invForm, setInvForm, mostrarAlerta, cargarTo
       .replace(/[\u0300-\u036f]/g, "")
       .trim();
 
-    // Homologación estricta de términos cortos antes de cargar el selector
     let estadoLimpio = 'ACTIVO';
     if (estadoDB.includes("COSECHA")) {
       estadoLimpio = "EN_COSECHA";
     } else if (estadoDB.includes("PREPARAC")) {
       estadoLimpio = "EN_PREPARACION";
-    } else if (estadoDB.includes("DESCANSO") || estadoDB === "INACTIVO" && item.activo !== false) {
-      estadoLimpio = "EN_DESCANSO"; // Si está activo el renglón pero dice inactivo, es descanso de tierra
+    } else if (estadoDB.includes("DESCANSO") || (estadoDB === "INACTIVO" && item.activo !== false)) {
+      estadoLimpio = "EN_DESCANSO";
     } else if (item.activo === false) {
       estadoLimpio = "INACTIVO";
     }
@@ -76,7 +74,6 @@ export default function ConfigInv({ invForm, setInvForm, mostrarAlerta, cargarTo
     window.scrollTo({ top: 0, behavior: 'smooth' }); 
   };
 
-  // --- LIMPIAR FORMULARIO / CANCELAR EDICIÓN ---
   const limpiarFormulario = () => {
     setInvForm({
       id_editando: null,
@@ -92,7 +89,6 @@ export default function ConfigInv({ invForm, setInvForm, mostrarAlerta, cargarTo
     });
   };
 
-  // --- GUARDAR O ACTUALIZAR REGISTRO INVI ---
   const handleSave = async () => {
     if (!invForm.nombre) {
       mostrarAlerta("El nombre es obligatorio", "error");
@@ -109,32 +105,23 @@ export default function ConfigInv({ invForm, setInvForm, mostrarAlerta, cargarTo
       fecha_cosecha_est: invForm.cosecha || null, 
       estado: invForm.estado, 
       descripcion: invForm.descripcion ? invForm.descripcion.toUpperCase().trim() : null,
-      cultivo: invForm.cultivo || null 
+      cultivo: invForm.cultivo || null,
+      activo: true
     };
 
     try {
       let error;
-      
       if (invForm.id_editando) {
-        const res = await supabase
-          .from('invernaderos')
-          .update(payload)
-          .eq('id', invForm.id_editando);
+        const res = await supabase.from('invernaderos').update(payload).eq('id', invForm.id_editando);
         error = res.error;
       } else {
-        const res = await supabase
-          .from('invernaderos')
-          .insert([payload]);
+        const res = await supabase.from('invernaderos').insert([payload]);
         error = res.error;
       }
 
       if (error) throw error;
 
-      mostrarAlerta(
-        invForm.id_editando ? "Invernadero actualizado exitosamente" : "Invernadero creado exitosamente", 
-        "exito"
-      );
-      
+      mostrarAlerta(invForm.id_editando ? "Invernadero actualizado exitosamente" : "Invernadero creado exitosamente", "exito");
       limpiarFormulario();
       cargarTodo();
     } catch (err) {
@@ -143,9 +130,9 @@ export default function ConfigInv({ invForm, setInvForm, mostrarAlerta, cargarTo
     }
   };
 
-  // --- PASAR A ESTADO INACTIVO (LÓGICO) ---
+  // ARCHIVAR / INACTIVAR (LÓGICO)
   const handleInactivarLogico = async (id, nombre) => {
-    const confirmar = window.confirm(`¿Estás seguro de INACTIVAR el "${nombre}"? Se conservará su historial contable intacto pero ya no aparecerá en el Dashboard ni en formularios.`);
+    const confirmar = window.confirm(`¿Estás seguro de ARCHIVAR el "${nombre}"?\n\nToda su información contable, ventas y cosechas pasadas PERMANECERÁ GUARDADA intacta en el sistema, pero el bloque se moverá a la pestaña de "Archivados".`);
     
     if (!confirmar) return;
 
@@ -157,7 +144,7 @@ export default function ConfigInv({ invForm, setInvForm, mostrarAlerta, cargarTo
 
       if (error) throw error;
 
-      mostrarAlerta("Invernadero inactivado con éxito", "exito");
+      mostrarAlerta("Invernadero archivado exitosamente. Historial conservado intacto.", "exito");
       await cargarTodo(); 
     } catch (err) {
       console.error("Error al inactivar el invernadero:", err);
@@ -165,8 +152,116 @@ export default function ConfigInv({ invForm, setInvForm, mostrarAlerta, cargarTo
     }
   };
 
+  // REACTIVAR INVERNADERO ARCHIVADO
+  const handleReactivar = async (id, nombre) => {
+    if (!window.confirm(`¿Deseas REACTIVAR el "${nombre}" para volver a operarlo?`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('invernaderos')
+        .update({ activo: true, estado: 'ACTIVO' })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      mostrarAlerta("Invernadero reactivado y disponible para producción", "exito");
+      await cargarTodo(); 
+    } catch (err) {
+      mostrarAlerta("Error al reactivar el invernadero", "error");
+    }
+  };
+
+  // EXPORTAR CATALOGO DE INVERNADEROS A EXCEL
+  const exportarInvernaderosAExcel = async () => {
+    if (!lista || lista.length === 0) {
+      mostrarAlerta("No hay invernaderos para exportar", "error");
+      return;
+    }
+
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const sheet = workbook.addWorksheet('Estructura Invernaderos');
+
+      sheet.columns = [
+        { header: 'INVERNADERO / BLOQUE', key: 'nombre', width: 28 },
+        { header: 'CULTIVO PRINCIPAL', key: 'cultivo', width: 22 },
+        { header: 'VARIEDAD', key: 'variedad', width: 18 },
+        { header: 'LARGO (M)', key: 'largo', width: 14 },
+        { header: 'ANCHO (M)', key: 'ancho', width: 14 },
+        { header: 'ÁREA APROX (M²)', key: 'area', width: 18 },
+        { header: 'FECHA SIEMBRA', key: 'siembra', width: 16 },
+        { header: 'EST. COSECHA', key: 'cosecha', width: 16 },
+        { header: 'ESTADO OPERATIVO', key: 'estado', width: 20 },
+        { header: 'SITUACIÓN', key: 'activo', width: 16 }
+      ];
+
+      lista.forEach(inv => {
+        const l = parseFloat(inv.largo || 0);
+        const a = parseFloat(inv.ancho || 0);
+        sheet.addRow({
+          nombre: (inv.nombre || '').toUpperCase(),
+          cultivo: (inv.cultivo || inv.cultivo_principal || 'S/C').toUpperCase(),
+          variedad: (inv.variedad || 'S/V').toUpperCase(),
+          largo: l,
+          ancho: a,
+          area: l * a,
+          siembra: inv.fecha_siembra || 'N/R',
+          cosecha: inv.fecha_cosecha_est || 'N/R',
+          estado: (inv.estado || 'ACTIVO').replace('_', ' ').toUpperCase(),
+          activo: inv.activo !== false ? 'OPERATIVO' : 'ARCHIVADO'
+        });
+      });
+
+      const headerRow = sheet.getRow(1);
+      headerRow.height = 24;
+      headerRow.eachCell(cell => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF15803D' } };
+        cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      });
+
+      sheet.eachRow((row, rNum) => {
+        if (rNum === 1) return;
+        row.height = 20;
+        const cebra = rNum % 2 === 0;
+        row.eachCell((cell, colN) => {
+          cell.font = { name: 'Arial', size: 9 };
+          if (cebra) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2EFDA' } };
+          if ([4, 5, 6].includes(colN)) cell.alignment = { vertical: 'middle', horizontal: 'right' };
+          else if ([7, 8, 9, 10].includes(colN)) cell.alignment = { vertical: 'middle', horizontal: 'center' };
+          else cell.alignment = { vertical: 'middle', horizontal: 'left' };
+        });
+      });
+
+      sheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: sheet.rowCount, column: sheet.columnCount } };
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const fechaHoy = new Date().toISOString().split('T')[0];
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `ESTRUCTURA_INVERNADEROS_${fechaHoy}.xlsx`);
+
+      mostrarAlerta("Estructura de invernaderos exportada a Excel con éxito", "exito");
+    } catch (err) {
+      console.error("Error al exportar invernaderos:", err);
+      mostrarAlerta("Error al generar el archivo Excel", "error");
+    }
+  };
+
+  // Filtrado de la lista por pestaña y búsqueda
+  const listaActivos = (lista || []).filter(i => i.activo !== false);
+  const listaArchivados = (lista || []).filter(i => i.activo === false);
+
+  const listaFiltradaTabla = (tabTabla === 'activos' ? listaActivos : listaArchivados).filter(inv => {
+    const q = busqueda.toLowerCase();
+    return (
+      (inv.nombre || '').toLowerCase().includes(q) ||
+      (inv.cultivo || inv.cultivo_principal || '').toLowerCase().includes(q) ||
+      (inv.variedad || '').toLowerCase().includes(q)
+    );
+  });
+
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 pb-20 text-slate-800">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* COLUMNA IZQUIERDA: FORMULARIO */}
@@ -188,7 +283,7 @@ export default function ConfigInv({ invForm, setInvForm, mostrarAlerta, cargarTo
           
           <div className="space-y-4">
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase px-1 italic">Nombre / Identificador</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase px-1 italic">Nombre / Identificador *</label>
               <input 
                 type="text" 
                 className="w-full border-2 p-2.5 rounded-xl font-bold text-sm uppercase outline-none focus:border-green-700" 
@@ -279,7 +374,6 @@ export default function ConfigInv({ invForm, setInvForm, mostrarAlerta, cargarTo
               </div>
             </div>
 
-            {/* SELECTOR UNIFICADO CON LOS NUEVOS TÉRMINOS CORTOS */}
             <div>
               <label className="text-[10px] font-bold text-gray-400 uppercase px-1 italic">Estado Actual del Bloque</label>
               <select 
@@ -315,50 +409,92 @@ export default function ConfigInv({ invForm, setInvForm, mostrarAlerta, cargarTo
           </div>
         </div>
 
-        {/* COLUMNA DERECHA: TABLA CON RENDERIZADO VISUAL REPARADO */}
-        <div className="lg:col-span-2 bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-200">
-          <div className="p-4 bg-slate-800 text-white font-black text-xs uppercase tracking-widest italic">Mapeo Estructural de Bloques</div>
-          <div className="overflow-x-auto">
+        {/* COLUMNA DERECHA: TABLA CON PESTAÑAS Y BÚSQUEDA */}
+        <div className="lg:col-span-2 bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-200 flex flex-col">
+          
+          <div className="p-4 bg-slate-800 text-white font-black text-xs uppercase tracking-wider flex flex-col sm:flex-row justify-between items-center gap-3">
+            
+            {/* PESTAÑAS: OPERATIVOS vs ARCHIVADOS */}
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setTabTabla('activos')} 
+                className={`px-3 py-1.5 rounded-lg text-[10px] uppercase font-black transition-all ${
+                  tabTabla === 'activos' ? 'bg-green-700 text-white shadow' : 'bg-slate-700 text-slate-300'
+                }`}
+              >
+                🌱 Operativos ({listaActivos.length})
+              </button>
+              <button 
+                onClick={() => setTabTabla('archivados')} 
+                className={`px-3 py-1.5 rounded-lg text-[10px] uppercase font-black transition-all ${
+                  tabTabla === 'archivados' ? 'bg-red-600 text-white shadow' : 'bg-slate-700 text-slate-300'
+                }`}
+              >
+                📁 Archivados / Inactivos ({listaArchivados.length})
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto justify-end">
+              <button
+                onClick={exportarInvernaderosAExcel}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-black uppercase rounded-xl shadow transition-colors flex items-center gap-1"
+              >
+                📊 EXPORTAR EXCEL
+              </button>
+
+              <input 
+                type="text" 
+                placeholder="🔍 Buscar bloque, cultivo..." 
+                className="px-3 py-1.5 text-xs rounded-xl text-slate-800 outline-none font-bold placeholder-gray-400 min-w-[180px]"
+                value={busqueda}
+                onChange={e => setBusqueda(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="overflow-x-auto min-h-[400px]">
             <table className="w-full text-left text-[11px] border-collapse">
               <thead>
-                <tr className="bg-gray-300 text-slate-800 uppercase font-black">
-                  <th className="p-4">Nombre</th>
-                  <th className="p-4">Cultivo / Clasificación</th>
-                  <th className="p-4 text-center">Estado</th>
-                  <th className="p-4">Siembra / Est. Cosecha</th>
-                  <th className="p-4 text-center">Acciones</th>
+                <tr className="bg-gray-200 text-slate-800 uppercase font-black sticky top-0">
+                  <th className="p-3.5 border-b border-gray-300">Invernadero / Bloque</th>
+                  <th className="p-3.5 border-b border-gray-300">Cultivo / Clasificación</th>
+                  <th className="p-3.5 border-b border-gray-300 text-center">Estado</th>
+                  <th className="p-3.5 border-b border-gray-300">Siembra / Est. Cosecha</th>
+                  <th className="p-3.5 border-b border-gray-300 text-center">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y-2 divide-gray-400">
-                {lista?.length === 0 ? (
+              <tbody className="divide-y divide-gray-200 font-bold text-slate-700">
+                {listaFiltradaTabla.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="p-6 text-center text-gray-400 italic font-bold">No hay invernaderos configurados aún.</td>
+                    <td colSpan="5" className="p-8 text-center text-gray-400 italic font-bold">
+                      {tabTabla === 'activos' ? 'No hay invernaderos activos en producción.' : 'No hay invernaderos archivados en el histórico.'}
+                    </td>
                   </tr>
                 ) : (
-                  lista?.map((item, index) => {
+                  listaFiltradaTabla.map((item, index) => {
                     const esInactivo = item.activo === false;
                     const estVisual = String(item.estado || '').toUpperCase();
 
                     return (
-                      <tr key={item.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-200'} hover:bg-yellow-100 transition-colors`}>
+                      <tr key={item.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-slate-50'} hover:bg-sky-50 transition-colors`}>
                         
-                        <td className={`p-4 font-black text-slate-900 border-l-8 ${esInactivo ? 'border-red-600 bg-red-50/50' : 'border-green-700'}`}>
-                          {item.nombre} {esInactivo && <span className="text-[9px] text-red-500 italic block mt-0.5">(Archivado)</span>}
+                        <td className={`p-3.5 font-black text-slate-900 border-l-4 ${esInactivo ? 'border-red-600 bg-red-50/40' : 'border-green-700'}`}>
+                          <p className="uppercase text-xs">{item.nombre}</p>
+                          {esInactivo && <span className="text-[9px] text-red-500 font-bold italic block mt-0.5">📁 Registros Conservados</span>}
                         </td>
                         
-                        <td className="p-4 font-bold text-slate-700 uppercase">
-                          {item.cultivo || item.cultivo_principal} - {item.variedad || 'S/C'}
-                          <p className="text-[9px] text-slate-400 font-bold lowercase italic mt-0.5">📐 Área: {item.largo || 0}m × {item.ancho || 0}m</p>
+                        <td className="p-3.5 font-bold text-slate-700 uppercase">
+                          <p>{item.cultivo || item.cultivo_principal || 'S/C'} - {item.variedad || 'S/C'}</p>
+                          <p className="text-[9px] text-slate-400 font-bold lowercase italic mt-0.5">📐 Área: {item.largo || 0}m × {item.ancho || 0}m ({(parseFloat(item.largo || 0) * parseFloat(item.ancho || 0)).toLocaleString()} m²)</p>
                         </td>
                         
-                        {/* CONTROL DE RENDERS DE COLOR CORREGIDO SEGÚN IMAGE_2C87C9.PNG */}
-                        <td className="p-4 text-center">
+                        <td className="p-3.5 text-center">
                           {esInactivo ? (
-                            <span className="px-3 py-1 rounded-md text-[10px] font-black uppercase shadow-sm bg-red-100 text-red-600 border border-red-300">
-                              INACTIVO
+                            <span className="px-2.5 py-1 rounded-md text-[9px] font-black uppercase shadow-sm bg-red-100 text-red-700 border border-red-300">
+                              ARCHIVADO
                             </span>
                           ) : (
-                            <span className={`px-3 py-1 rounded-md text-[10px] font-black uppercase shadow-sm ${
+                            <span className={`px-2.5 py-1 rounded-md text-[9px] font-black uppercase shadow-sm ${
                               estVisual === 'ACTIVO' ? 'bg-green-100 text-green-700 border border-green-300' : 
                               estVisual === 'EN_COSECHA' ? 'bg-blue-100 text-blue-700 border border-blue-300' :
                               estVisual === 'EN_PREPARACION' ? 'bg-amber-100 text-amber-700 border border-amber-300' : 
@@ -370,32 +506,40 @@ export default function ConfigInv({ invForm, setInvForm, mostrarAlerta, cargarTo
                           )}
                         </td>
 
-                        <td className="p-4 font-bold text-slate-600">
-                          <p>🌱 <span className="text-slate-500">S:</span> {item.fecha_siembra || 'N/R'}</p>
-                          <p>🚜 <span className="text-slate-500">C:</span> {item.fecha_cosecha_est || 'N/R'}</p>
+                        <td className="p-3.5 font-bold text-slate-600">
+                          <p>🌱 <span className="text-slate-400 text-[10px]">S:</span> {item.fecha_siembra || 'N/R'}</p>
+                          <p>🚜 <span className="text-slate-400 text-[10px]">C:</span> {item.fecha_cosecha_est || 'N/R'}</p>
                         </td>
 
-                        <td className="p-4 text-center">
+                        <td className="p-3.5 text-center">
                           <div className="flex gap-1.5 justify-center">
                             <button
                               type="button"
                               onClick={() => prepararEdicionInvernadero(item)}
-                              className="p-1.5 bg-amber-100 text-amber-700 hover:bg-amber-600 hover:text-white rounded-lg border border-amber-300 transition-colors"
+                              className="p-1.5 bg-amber-100 text-amber-700 hover:bg-amber-600 hover:text-white rounded-lg border border-amber-200 transition-all text-xs"
                               title="Editar Invernadero"
                             >
                               ✏️
                             </button>
+                            
                             {!esInactivo ? (
                               <button
                                 type="button"
                                 onClick={() => handleInactivarLogico(item.id, item.nombre)}
-                                className="p-1.5 bg-red-100 text-red-700 hover:bg-red-600 hover:text-white rounded-lg border border-red-200 transition-colors"
-                                title="Inactivar / Archivar"
+                                className="p-1.5 bg-red-100 text-red-700 hover:bg-red-600 hover:text-white rounded-lg border border-red-200 transition-all text-xs"
+                                title="Archivar Invernadero"
                               >
                                 🚫
                               </button>
                             ) : (
-                              <span className="text-[9px] text-gray-400 font-bold uppercase italic">Archivado</span>
+                              <button
+                                type="button"
+                                onClick={() => handleReactivar(item.id, item.nombre)}
+                                className="p-1.5 bg-emerald-100 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg border border-emerald-300 transition-all text-xs"
+                                title="Reactivar Invernadero"
+                              >
+                                ♻️
+                              </button>
                             )}
                           </div>
                         </td>
@@ -407,6 +551,7 @@ export default function ConfigInv({ invForm, setInvForm, mostrarAlerta, cargarTo
               </tbody>
             </table>
           </div>
+
         </div>
 
       </div>

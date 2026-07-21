@@ -452,67 +452,105 @@ function App() {
 
   const imprimirGastoPDF = (gasto) => {
     try {
+      // Crear documento A6 idéntico a tu configuración
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [105, 148] });
-      doc.setDrawColor(0, 80, 0); doc.setLineWidth(0.8); doc.rect(4, 4, 97, 140);
-      doc.addImage('/Logopapel.png', 'PNG', 42.5, 7, 20, 20);
-      doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.text("Comp. N°:", 10, 12);
-      doc.setFont("helvetica", "normal"); doc.text(`${gasto.numero_comprobante || gasto.id || 'S/N'}`, 28, 12);
-      doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(0, 80, 0);
-      doc.text("COMPROBANTE DE GASTO", 52.5, 30, { align: "center" });
+      
+      // 🫐 Borde exterior decorativo en Azul Océano
+      doc.setDrawColor(17, 112, 151); 
+      doc.setLineWidth(0.8); 
+      doc.rect(4, 4, 97, 140);
 
-      const altoFila = 5; const yBase = 35;
-      doc.setFillColor(180, 220, 180); doc.rect(7, yBase, 91, altoFila, 'F'); 
-      doc.setDrawColor(0, 80, 0); doc.setLineWidth(0.2); doc.rect(7, yBase, 91, altoFila * 2); 
-      doc.line(7, yBase + altoFila, 98, yBase + altoFila); doc.line(50, yBase, 50, yBase + (altoFila * 2)); 
+      // 🫐 Imagen del logo centrada
+      try {
+        doc.addImage('/Logopapel.png', 'PNG', 42.5, 7, 20, 20);
+      } catch (e) {
+        console.log("No se pudo cargar el logo en el PDF");
+      }
 
-      const yOffset = 3.5;
-      doc.setFont("helvetica", "bold"); doc.setTextColor(0); doc.text("Fecha:", 10, yBase + yOffset);
-      doc.setFont("helvetica", "normal"); doc.text(`${gasto.fecha_gasto || ''}`, 25, yBase + yOffset);
-      doc.setFont("helvetica", "bold"); doc.text("Invernadero:", 52, yBase + yOffset);
-      doc.setFont("helvetica", "normal"); doc.text(`${gasto.invernaderos?.nombre || 'Gral'}`, 72, yBase + yOffset);
+      // 🫐 Consecutivo del Comprobante (Arriba a la izquierda)
+      doc.setFont("helvetica", "bold"); 
+      doc.setFontSize(8); 
+      doc.setTextColor(60, 60, 60);
+      doc.text(`Comp. N°: ${gasto.numero_comprobante || gasto.id || 'S/N'}`, 7, 12);
 
+      // 🫐 Título Principal
+      doc.setFont("helvetica", "bold"); 
+      doc.setFontSize(11); 
+      doc.setTextColor(17, 112, 151);
+      doc.text("COMPROBANTE DE GASTO", 52.5, 31, { align: "center" });
+
+      // 🗃️ SOLUCIÓN MAESTRA: Datos de cabecera organizados en una AutoTable invisible y compacta
       const nombreProv = gasto.nombre_proveedor || gasto.proveedores?.nombre_completo || gasto.proveedores?.nombre || 'Particular';
-      doc.setFont("helvetica", "bold"); doc.text("Proveedor:", 10, yBase + altoFila + yOffset);
-      doc.setFont("helvetica", "normal"); doc.text(`${nombreProv}`, 27, yBase + altoFila + yOffset);
-
-      let yDetalles = yBase + (altoFila * 2);
-      doc.setFillColor(180, 220, 180); doc.rect(7, yDetalles, 91, altoFila, 'F');
-      doc.rect(7, yDetalles, 91, altoFila * 2); doc.line(7, yDetalles + altoFila, 98, yDetalles + altoFila);
-
       const nit = gasto.nit_cc || gasto.proveedores?.nit_cc || 'N/A';
-      const tel = gasto.telefono_proveedor || gasto.proveedores?.telefono || 'N/A';
-      const ciudad = gasto.ciudad_proveedor || gasto.proveedores?.ciudad || 'N/A';
+      const tel = gasto.telefono_proveedor || gasto.proveedores?.telefono || 'N/R';
+      const ciudad = gasto.ciudad_proveedor || gasto.proveedores?.ciudad || 'N/R';
+      const invernadero = gasto.nombre_invernadero || gasto.invernaderos?.nombre || 'General';
 
-      doc.setFont("helvetica", "bold"); doc.text("NIT/CC:", 10, yDetalles + yOffset);
-      doc.setFont("helvetica", "normal"); doc.text(`${nit}`, 22, yDetalles + yOffset);
-      doc.setFont("helvetica", "bold"); doc.text("TEL:", 45, yDetalles + yOffset);
-      doc.setFont("helvetica", "normal"); doc.text(`${tel}`, 54, yDetalles + yOffset);
-      doc.setFont("helvetica", "bold"); doc.text("CIUDAD:", 72, yDetalles + yOffset);
-      doc.setFont("helvetica", "normal"); doc.text(`${ciudad}`, 86, yDetalles + yOffset);
-
-      doc.setFont("helvetica", "bold"); doc.text("NOTA:", 10, yDetalles + altoFila + yOffset);
-      doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.text(`${gasto.nota || 'Sin obs.'}`, 20, yDetalles + altoFila + yOffset);
-
-      doc.setFontSize(8);
       autoTable(doc, {
-        startY: yDetalles + (altoFila * 2) + 4, margin: { left: 7, right: 1 }, 
-        head: [["Cant.", "Unidad", "Detalle Pago", "Precio Unit.", "Monto Total"]],
-        body: [[gasto.cantidad || 0, gasto.unidad_medida || "Unidad", gasto.descripcion || "Gasto", `$${(gasto.precio_unitario || 0).toLocaleString('es-CO')}`, `$${(gasto.monto || 0).toLocaleString('es-CO')}`]],
-        theme: 'grid', styles: { fontSize: 7, cellPadding: 3, valign: 'middle', overflow: 'linebreak', lineWidth: 0.2, lineColor: [0, 80, 0] },
-        headStyles: { fillColor: [0, 80, 0], textColor: [255, 255, 255], halign: 'center', valign: 'middle', fontStyle: 'bold' },
-        columnStyles: { 0: { cellWidth: 9, halign: 'center' }, 1: { cellWidth: 14, halign: 'center' }, 2: { cellWidth: 35 }, 3: { cellWidth: 15, halign: 'right' }, 4: { cellWidth: 19, halign: 'right' } }
+        startY: 35,
+        margin: { left: 6, right: 6 },
+        theme: 'plain', // Sin bordes ni fondos toscos
+        styles: { fontSize: 7.5, cellPadding: 1, font: "helvetica" },
+        columnStyles: {
+          0: { cellWidth: 18, fontStyle: 'bold', textColor: [17, 112, 151] }, // Etiquetas en azul
+          1: { cellWidth: 28, textColor: [40, 40, 40] },
+          2: { cellWidth: 14, fontStyle: 'bold', textColor: [17, 112, 151] },
+          3: { cellWidth: 33, textColor: [40, 40, 40] }
+        },
+        body: [
+          ["Fecha:", `${gasto.fecha_gasto || ''}`, "Lote/Inv:", `${invernadero.toUpperCase()}`],
+          ["Proveedor:", `${nombreProv.toUpperCase()}`, "NIT/CC:", `${nit}`],
+          ["Teléfono:", `${tel}`, "Ciudad:", `${ciudad.toUpperCase()}`],
+          ["Nota/Obs:", { content: `${gasto.nota || 'Sin observaciones.'}`, colSpan: 3, styles: { fontStyle: 'italic' } }]
+        ]
       });
 
-      const finalY = doc.lastAutoTable.finalY + 8;
-      doc.setFontSize(10); doc.setFont("helvetica", "bold");
-      doc.text(`VALOR PAGADO: ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(gasto.monto || 0)}`, 95, finalY, { align: "right" });
+      // 🫐 Tabla Inferior de los Ítems del Gasto (Se posiciona automáticamente abajo de la cabecera)
+      const yTablaDetalle = doc.lastAutoTable.finalY + 3;
+      autoTable(doc, {
+        startY: yTablaDetalle, 
+        margin: { left: 6, right: 6 }, 
+        head: [["Cant.", "Unidad", "Detalle del Pago", "Precio Unit.", "Monto Total"]],
+        body: [[
+          gasto.cantidad || 0, 
+          gasto.unidad_medida || "Unidad", 
+          gasto.descripcion || "Gasto", 
+          `$${(gasto.precio_unitario || 0).toLocaleString('es-CO')}`, 
+          `$${(gasto.monto || 0).toLocaleString('es-CO')}`
+        ]],
+        theme: 'grid', 
+        styles: { fontSize: 7, cellPadding: 2, valign: 'middle', overflow: 'linebreak', lineWidth: 0.1, lineColor: [17, 112, 151] },
+        headStyles: { fillColor: [17, 112, 151], textColor: [255, 255, 255], halign: 'center', fontStyle: 'bold' },
+        columnStyles: { 
+          0: { cellWidth: 9, halign: 'center' }, 
+          1: { cellWidth: 14, halign: 'center' }, 
+          2: { cellWidth: 35 }, 
+          3: { cellWidth: 16, halign: 'right' }, 
+          4: { cellWidth: 19, halign: 'right' } 
+        }
+      });
 
-      const yFirmas = finalY + 15; doc.line(10, yFirmas, 45, yFirmas); doc.line(60, yFirmas, 95, yFirmas);
-      doc.setFontSize(7); doc.text("ENTREGUÉ CONFORME", 15, yFirmas + 4); doc.text("RECIBÍ CONFORME", 68, yFirmas + 4);
+      // 🫐 Bloque de Totales Consolidado
+      const finalY = doc.lastAutoTable.finalY + 5;
+      doc.setFontSize(9.5); 
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(0);
+      doc.text(`VALOR PAGADO: ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(gasto.monto || 0)}`, 99, finalY, { align: "right" });
 
+      // 🫐 Sección de Firmas de Control inferior
+      const yFirmas = Math.max(finalY + 15, 128); // Asegura que las firmas se queden abajo del papel A6
+      doc.setDrawColor(180, 180, 180);
+      doc.setLineWidth(0.3);
+      doc.line(8, yFirmas, 46, yFirmas); 
+      doc.line(59, yFirmas, 97, yFirmas);
+      doc.setFontSize(6.5); 
+      doc.text("ENTREGUÉ CONFORME", 27, yFirmas + 3.5, { align: "center" }); 
+      doc.text("RECIBÍ CONFORME", 78, yFirmas + 3.5, { align: "center" });
+
+      // Guardar archivo
       doc.save(`Gasto_${gasto.numero_comprobante || gasto.id}.pdf`);
     } catch (err) {
-      console.error(err);
+      console.error("Error al generar PDF de Gasto:", err);
     }
   };
 
@@ -700,6 +738,7 @@ function App() {
               <Inventario 
                 mostrarAlerta={mostrarAlerta}
                 datosInvernaderos={listaInvernaderos}
+                userRole={userRole}
               />
             )}
 
