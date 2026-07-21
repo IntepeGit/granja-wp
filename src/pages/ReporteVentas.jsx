@@ -54,9 +54,12 @@ export default function ReporteVentas({ listaInvernaderos, datosDespachos, datos
     style: 'currency', currency: 'COP', minimumFractionDigits: 0 
   }).format(valor || 0);
 
-  const invernaderosActivos = listaInvernaderos?.filter(inv => inv.activo !== false) || [];
+  // --- 1. SEPARACIÓN DE INVERNADEROS Y NOMBRES ---
+  const invernaderosActivos = (listaInvernaderos || []).filter(inv => inv.activo !== false);
   const idsInvernaderosActivos = invernaderosActivos.map(inv => inv.id?.toString());
-  const nombreInvSeleccionado = listaInvernaderos?.find(i => i.id?.toString() === invSeleccionado)?.nombre || 'TODOS LOS INVERNADEROS';
+  
+  const objInvSeleccionado = (listaInvernaderos || []).find(i => i.id?.toString() === invSeleccionado);
+  const nombreInvSeleccionado = objInvSeleccionado ? objInvSeleccionado.nombre?.toUpperCase() : 'TODOS LOS INVERNADEROS (EN PRODUCCIÓN)';
 
   const enRangoFecha = (fechaStr) => {
     if (!fechaStr) return true;
@@ -66,29 +69,39 @@ export default function ReporteVentas({ listaInvernaderos, datosDespachos, datos
     return true;
   };
 
-  // Filtrado general
+  // --- 2. FILTRADO CONHERENTE SEGÚN LA SELECCIÓN ---
+  // A. Despachos / Ventas
   const despachosFiltrados = (datosDespachos || []).filter(d => {
-    const coincideInv = !invSeleccionado ? idsInvernaderosActivos.includes(d.invernadero_id?.toString()) : d.invernadero_id?.toString() === invSeleccionado;
+    const coincideInv = !invSeleccionado 
+      ? idsInvernaderosActivos.includes(d.invernadero_id?.toString()) 
+      : d.invernadero_id?.toString() === invSeleccionado;
     return coincideInv && enRangoFecha(d.fecha_venta);
   });
 
+  // B. Gastos e Insumos (Filtrado estricto por lotes activos si no hay uno seleccionado)
   const egresosFiltrados = (datosEgresos || []).filter(g => {
-    const coincideInv = !invSeleccionado ? true : g.invernadero_id?.toString() === invSeleccionado;
+    const coincideInv = !invSeleccionado 
+      ? (!g.invernadero_id || idsInvernaderosActivos.includes(g.invernadero_id?.toString()))
+      : g.invernadero_id?.toString() === invSeleccionado;
     return coincideInv && enRangoFecha(g.fecha_gasto);
   });
 
+  // C. Recaudos
   const idsDespachosFiltrados = despachosFiltrados.map(d => d.id?.toString());
   const pagosFiltrados = (datosPagos || []).filter(p => {
     const perteneceADespacho = idsDespachosFiltrados.includes(p.despacho_id?.toString());
     return perteneceADespacho && enRangoFecha(p.fecha_pago);
   });
 
+  // D. Nómina (Mano de Obra)
   const nominaFiltrada = (historicoPagosNomina || []).filter(p => {
-    const coincideInv = !invSeleccionado ? true : (p.invernadero_nombre || '').toUpperCase().includes(nombreInvSeleccionado.toUpperCase());
+    const coincideInv = !invSeleccionado
+      ? (!p.invernadero_nombre || invernaderosActivos.some(i => i.nombre?.toUpperCase() === p.invernadero_nombre?.toUpperCase()))
+      : (p.invernadero_nombre || '').toUpperCase().includes(nombreInvSeleccionado.toUpperCase());
     return coincideInv && enRangoFecha(p.fecha_pago);
   });
 
-  // Cálculos consolidados
+  // --- 3. CÁLCULOS CONSOLIDADOS ---
   const totalVentas = despachosFiltrados.reduce((acc, d) => acc + parseFloat(d.total_venta || 0), 0);
   
   const totalInsumosGastos = egresosFiltrados
@@ -109,22 +122,19 @@ export default function ReporteVentas({ listaInvernaderos, datosDespachos, datos
     { name: 'Utilidad', valor: utilidadNeta, color: '#3b82f6' }
   ];
 
-  // --- 📊 EXPORTAR A EXCEL CON FORMATO Y COLORES RESTAURADOS ---
+  // --- 📊 EXPORTAR A EXCEL ---
   const exportarReporteAExcel = async () => {
     try {
       const workbook = new ExcelJS.Workbook();
       const hoyStr = new Date().toISOString().split('T')[0];
 
-      // =======================================================
       // HOJA 1: RESUMEN FINANCIERO
-      // =======================================================
       const wsResumen = workbook.addWorksheet('Resumen Financiero');
       wsResumen.columns = [
         { header: 'CONCEPTO FINANCIERO', key: 'concepto', width: 42 },
         { header: 'VALOR TOTAL (COP)', key: 'valor', width: 25 }
       ];
 
-      // Agregamos directamente las métricas
       const filaVentas = wsResumen.addRow({ concepto: 'VENTAS TOTALES (INGRESOS)', valor: totalVentas });
       const filaGastos = wsResumen.addRow({ concepto: 'GASTOS TOTALES (CON MANO DE OBRA)', valor: totalGastos });
       const filaUtilidad = wsResumen.addRow({ concepto: 'UTILIDAD NETA OPERACIONAL', valor: utilidadNeta });
@@ -132,7 +142,6 @@ export default function ReporteVentas({ listaInvernaderos, datosDespachos, datos
       const filaRecaudado = wsResumen.addRow({ concepto: 'TOTAL RECAUDADO (CAJA DE COBRO)', valor: pagosRecibidos });
       const filaCartera = wsResumen.addRow({ concepto: 'CUENTAS POR COBRAR (CARTERA PENDIENTE)', valor: cuentasPorCobrar });
 
-      // Estilo de Encabezado Hoja 1
       const headerRow1 = wsResumen.getRow(1);
       headerRow1.height = 24;
       headerRow1.eachCell(c => {
@@ -141,16 +150,15 @@ export default function ReporteVentas({ listaInvernaderos, datosDespachos, datos
         c.alignment = { vertical: 'middle', horizontal: 'center' };
       });
 
-      // Mapeo exacto de estilos y colores por celda
       [filaVentas, filaGastos, filaUtilidad, filaMargen, filaRecaudado, filaCartera].forEach(row => {
         row.height = 22;
         row.getCell(1).font = { name: 'Arial', size: 10, bold: true };
         row.getCell(2).font = { name: 'Arial', size: 11, bold: true };
       });
 
-      filaVentas.getCell(2).font.color = { argb: 'FF15803D' }; // Verde
-      filaGastos.getCell(2).font.color = { argb: 'FFB91C1C' }; // Rojo
-      filaUtilidad.getCell(2).font.color = { argb: 'FF1D4ED8' }; // Azul
+      filaVentas.getCell(2).font.color = { argb: 'FF15803D' };
+      filaGastos.getCell(2).font.color = { argb: 'FFB91C1C' };
+      filaUtilidad.getCell(2).font.color = { argb: 'FF1D4ED8' };
 
       [filaVentas, filaGastos, filaUtilidad, filaRecaudado, filaCartera].forEach(row => {
         row.getCell(2).numFmt = '"$"#,##0';
@@ -160,9 +168,7 @@ export default function ReporteVentas({ listaInvernaderos, datosDespachos, datos
       filaMargen.getCell(2).numFmt = '0.0%';
       filaMargen.getCell(2).alignment = { horizontal: 'right', vertical: 'middle' };
 
-      // =======================================================
       // HOJA 2: DETALLE DE VENTAS
-      // =======================================================
       const wsVentas = workbook.addWorksheet('Detalle Ventas');
       wsVentas.columns = [
         { header: 'FECHA VENTA', key: 'fecha', width: 15 },
@@ -190,9 +196,7 @@ export default function ReporteVentas({ listaInvernaderos, datosDespachos, datos
       filaTotV.getCell('cliente').font = { name: 'Arial', size: 10, bold: true };
       filaTotV.getCell('total').font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF15803D' } };
 
-      // =======================================================
       // HOJA 3: DETALLE GASTOS INSUMOS
-      // =======================================================
       const wsGastos = workbook.addWorksheet('Detalle Gastos Insumos');
       wsGastos.columns = [
         { header: 'FECHA GASTO', key: 'fecha', width: 15 },
@@ -222,9 +226,7 @@ export default function ReporteVentas({ listaInvernaderos, datosDespachos, datos
       filaTotG.getCell('desc').font = { name: 'Arial', size: 10, bold: true };
       filaTotG.getCell('monto').font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FFB91C1C' } };
 
-      // =======================================================
       // HOJA 4: DETALLE MANO DE OBRA
-      // =======================================================
       const wsManoObra = workbook.addWorksheet('Detalle Mano de Obra');
       wsManoObra.columns = [
         { header: 'COMP. N°', key: 'comp', width: 14 },
@@ -252,7 +254,7 @@ export default function ReporteVentas({ listaInvernaderos, datosDespachos, datos
       filaTotM.getCell('nombre').font = { name: 'Arial', size: 10, bold: true };
       filaTotM.getCell('monto').font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF6B21A8' } };
 
-      // FORMATEO VISUAL UNIFORME DE TABLAS (Hojas 2, 3 y 4)
+      // FORMATEO VISUAL UNIFORME DE TABLAS
       [wsVentas, wsGastos, wsManoObra].forEach(ws => {
         const head = ws.getRow(1);
         head.height = 24;
@@ -312,6 +314,8 @@ export default function ReporteVentas({ listaInvernaderos, datosDespachos, datos
       {/* SECCIÓN DE FILTROS SUPERIORES */}
       <div className="bg-white p-6 rounded-3xl shadow-xl border-t-8 border-[#117097] space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          
+          {/* SELECTOR ORGANIZADO CON GRUPOS DE OPERATIVOS Y ARCHIVADOS */}
           <div>
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest italic px-1">Análisis de Invernadero / Bloque</label>
             <select 
@@ -319,8 +323,19 @@ export default function ReporteVentas({ listaInvernaderos, datosDespachos, datos
               value={invSeleccionado}
               onChange={(e) => setInvSeleccionado(e.target.value)}
             >
-              <option value="">-- TODOS LOS INVERNADEROS --</option>
-              {listaInvernaderos?.map(inv => <option key={inv.id} value={inv.id}>{inv.nombre?.toUpperCase()}</option>)}
+              <option value="">-- TODOS LOS INVERNADEROS (EN PRODUCCIÓN) --</option>
+              
+              <optgroup label="🌱 EN PRODUCCIÓN (OPERATIVOS)">
+                {(listaInvernaderos || []).filter(i => i.activo !== false).map(inv => (
+                  <option key={inv.id} value={inv.id}>{inv.nombre?.toUpperCase()}</option>
+                ))}
+              </optgroup>
+
+              <optgroup label="📁 HISTÓRICO / ARCHIVADOS">
+                {(listaInvernaderos || []).filter(i => i.activo === false).map(inv => (
+                  <option key={inv.id} value={inv.id}>{inv.nombre?.toUpperCase()} (ARCHIVADO)</option>
+                ))}
+              </optgroup>
             </select>
           </div>
 

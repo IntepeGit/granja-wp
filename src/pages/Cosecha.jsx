@@ -6,7 +6,7 @@ import { saveAs } from 'file-saver';
 export default function Cosecha({ mostrarAlerta, listaInvernaderos, userRole }) {
   // Estados para datos de la tabla e historial
   const [registrosCosecha, setRegistrosCosecha] = useState([]);
-  const [listaTrabajadores, setListaTrabajadores] = useState([]); // 👈 Carga de operarios de nómina
+  const [listaTrabajadores, setListaTrabajadores] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   
@@ -14,7 +14,7 @@ export default function Cosecha({ mostrarAlerta, listaInvernaderos, userRole }) 
   const [filtroInvernadero, setFiltroInvernadero] = useState('');
   const [filtroProducto, setFiltroProducto] = useState('');
 
-  // Estados para las listas dinámicas traídas de Supabase
+  // Listas dinámicas traídas de Supabase
   const [listaProductos, setListaProductos] = useState([]);
   const [listaCalidades, setListaCalidades] = useState([]);
   const [listaUnidades, setListaUnidades] = useState([]);
@@ -44,7 +44,7 @@ export default function Cosecha({ mostrarAlerta, listaInvernaderos, userRole }) 
         supabase.from('config_productos').select('*').order('nombre_producto', { ascending: true }),
         supabase.from('config_calidades').select('*').order('nombre_calidad', { ascending: true }),
         supabase.from('config_unidades').select('*').order('nombre_unidad', { ascending: true }),
-        supabase.from('nomina_trabajadores').select('id, nombre_completo').eq('activo', true).order('nombre_completo', { ascending: true }) // 👈 Carga de Nómina
+        supabase.from('nomina_trabajadores').select('id, nombre_completo').eq('activo', true).order('nombre_completo', { ascending: true })
       ]);
 
       if (resCosechas.error) throw resCosechas.error;
@@ -170,7 +170,6 @@ export default function Cosecha({ mostrarAlerta, listaInvernaderos, userRole }) 
         cantidad: { formula: `=SUM(E2:E${ultFila})` }
       });
 
-      // Estilo de Encabezado
       const headerRow = sheet.getRow(1);
       headerRow.height = 24;
       headerRow.eachCell(cell => {
@@ -214,9 +213,16 @@ export default function Cosecha({ mostrarAlerta, listaInvernaderos, userRole }) 
     }
   };
 
-  // --- 5. LÓGICA DE FILTRADO Y BÚSQUEDA ---
+  // --- 5. SEPARACIÓN DE INVERNADEROS OPERATIVOS ---
+  const invernaderosOperativos = (listaInvernaderos || []).filter(i => i.activo !== false);
+  const idsOperativos = invernaderosOperativos.map(i => i.id?.toString());
+
+  // --- 6. LÓGICA DE FILTRADO Y BÚSQUEDA ---
   const registrosFiltrados = registrosCosecha.filter(item => {
-    const cumpleInvernadero = filtroInvernadero ? item.invernadero_id?.toString() === filtroInvernadero.toString() : true;
+    const cumpleInvernadero = !filtroInvernadero 
+      ? idsOperativos.includes(item.invernadero_id?.toString()) 
+      : item.invernadero_id?.toString() === filtroInvernadero.toString();
+      
     const cumpleProducto = filtroProducto ? item.producto === filtroProducto : true;
     
     const q = busqueda.toLowerCase();
@@ -245,7 +251,7 @@ export default function Cosecha({ mostrarAlerta, listaInvernaderos, userRole }) 
   return (
     <div className="space-y-6 pb-20 text-slate-800">
       
-      {/* SECCIÓN SUPERIOR DE FILTROS */}
+      {/* SECCIÓN SUPERIOR DE FILTROS ORGANIZADOS POR GRUPOS */}
       <div className="bg-slate-100 p-4 rounded-2xl border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 block">🌿 1. Filtrar Cultivo / Producto</label>
@@ -254,13 +260,23 @@ export default function Cosecha({ mostrarAlerta, listaInvernaderos, userRole }) 
             {listaProductos.map(p => <option key={p.id} value={p.nombre_producto}>{p.nombre_producto}</option>)}
           </select>
         </div>
+
         <div>
           <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 block">🔍 2. Filtrar Ubicación / Invernadero</label>
           <select className="w-full border-2 p-2.5 rounded-xl font-black bg-white border-slate-300 text-xs uppercase outline-none focus:border-green-700" value={filtroInvernadero} onChange={e => setFiltroInvernadero(e.target.value)}>
-            <option value="">VER TODA LA GRANJA</option>
-            {listaInvernaderos?.map(inv => (
-              <option key={inv.id} value={inv.id}>{inv.nombre?.toUpperCase() || inv.nombre_invernadero?.toUpperCase()}</option>
-            ))}
+            <option value="">VER TODA LA GRANJA (EN PRODUCCIÓN)</option>
+            
+            <optgroup label="🌱 EN PRODUCCIÓN (OPERATIVOS)">
+              {(listaInvernaderos || []).filter(i => i.activo !== false).map(inv => (
+                <option key={inv.id} value={inv.id}>{inv.nombre?.toUpperCase()}</option>
+              ))}
+            </optgroup>
+
+            <optgroup label="📁 HISTÓRICO / ARCHIVADOS">
+              {(listaInvernaderos || []).filter(i => i.activo === false).map(inv => (
+                <option key={inv.id} value={inv.id}>{inv.nombre?.toUpperCase()} (ARCHIVADO)</option>
+              ))}
+            </optgroup>
           </select>
         </div>
       </div>
@@ -318,9 +334,16 @@ export default function Cosecha({ mostrarAlerta, listaInvernaderos, userRole }) 
               <label className="text-[10px] font-bold text-gray-400 uppercase px-1 italic">Invernadero / Bloque *</label>
               <select className="w-full border-2 p-2.5 rounded-xl font-bold bg-white text-xs outline-none focus:border-green-700" value={formCosecha.invernadero_id} onChange={e => setFormCosecha({...formCosecha, invernadero_id: e.target.value})} required>
                 <option value="">Seleccione Invernadero...</option>
-                {listaInvernaderos?.filter(i => i.activo !== false).map(inv => (
-                  <option key={inv.id} value={inv.id}>{inv.nombre?.toUpperCase() || inv.nombre_invernadero?.toUpperCase()}</option>
-                ))}
+                <optgroup label="🌱 EN PRODUCCIÓN (OPERATIVOS)">
+                  {(listaInvernaderos || []).filter(i => i.activo !== false).map(inv => (
+                    <option key={inv.id} value={inv.id}>{inv.nombre?.toUpperCase()}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="📁 HISTÓRICO / ARCHIVADOS">
+                  {(listaInvernaderos || []).filter(i => i.activo === false).map(inv => (
+                    <option key={inv.id} value={inv.id}>{inv.nombre?.toUpperCase()} (ARCHIVADO)</option>
+                  ))}
+                </optgroup>
               </select>
             </div>
 
@@ -352,7 +375,6 @@ export default function Cosecha({ mostrarAlerta, listaInvernaderos, userRole }) 
               </div>
             </div>
 
-            {/* ⚡ SELECTOR DESPLEGABLE CON LOS OPERARIOS DE NÓMINA */}
             <div>
               <label className="text-[10px] font-bold text-gray-400 uppercase px-1 italic">Operario Encargado / Recolector (Nómina)</label>
               <select 
@@ -376,7 +398,7 @@ export default function Cosecha({ mostrarAlerta, listaInvernaderos, userRole }) 
           </form>
         </div>
 
-        {/* TABLA HISTÓRICA BÚSCABLE CON OPERARIO Y BOTÓN EXCEL */}
+        {/* TABLA HISTÓRICA */}
         <div className="lg:col-span-2 bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-200 flex flex-col">
           
           <div className="p-4 bg-slate-800 text-white font-black text-xs uppercase tracking-wider flex flex-col sm:flex-row justify-between items-center gap-3">
@@ -407,7 +429,6 @@ export default function Cosecha({ mostrarAlerta, listaInvernaderos, userRole }) 
                   <th className="p-3">Fecha</th>
                   <th className="p-3">Invernadero</th>
                   <th className="p-3">Producto / Calidad</th>
-                  {/* ⚡ COLUMNA OPERARIO VISIBLE */}
                   <th className="p-3">Recolector</th>
                   <th className="p-3 text-right">Cant. Recogida</th>
                   {userRole === 'admin' && <th className="p-3 text-center">Acción</th>}
@@ -425,7 +446,6 @@ export default function Cosecha({ mostrarAlerta, listaInvernaderos, userRole }) 
                         <span className="font-black text-slate-900 block">{item.producto}</span>
                         <span className="text-[9px] font-bold text-gray-400">{item.calidad}</span>
                       </td>
-                      {/* ⚡ VALOR DE RECOLECTOR EN TABLA */}
                       <td className="p-3 uppercase text-emerald-800 font-black">
                         👤 {item.operario_recolector || 'N/R'}
                       </td>
