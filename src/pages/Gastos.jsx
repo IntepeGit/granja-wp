@@ -1,5 +1,4 @@
-import { useEffect } from 'react';
-import * as XLSX from 'xlsx';
+import { useState, useEffect } from 'react';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
@@ -15,92 +14,196 @@ export default function Gastos({
   eliminarGasto,   
   imprimirGastoPDF 
 }) {
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [busqueda, setBusqueda] = useState('');
+  const [errores, setErrores] = useState({});
+
   const categorias = ["Mano de obra", "Insumo Agricola", "Flete", "Mto (Mantenimiento)", "S.Publicos", "Plantas", "Plasticos", "Viaticos","Arriendos", "Quincena", "Otros"];
   const unidades = ["Canastilla", "Kilo", "Bulto", "Litro", "Jornal", "Unidad", "Hora", "Otra", "Caja", "Garrafa", "Galon"];
   const formasPago = ["Efectivo", "Bre-B (Pago Inmediato)", "Bancolombia Ahorros", "Bancolombia Corriente", "Nequi", "Daviplata", "Banco de Bogotá", "Colpatria", "Davivienda", "Otro"];
+  const referencias = ["FACTURA", "TICKET / TIRILLA", "RECIBO", "COTIZACIÓN", "RECIBO DE CAJA", "CUENTA DE COBRO", "OTRO"];
 
-  // Formateador de moneda colombiana estricto para visualización estática
+  const obtenerFechaLocalHoy = () => {
+    const d = new Date();
+    const offset = d.getTimezoneOffset();
+    const localDate = new Date(d.getTime() - (offset * 60 * 1000));
+    return localDate.toISOString().split('T')[0];
+  };
+
+  const limpiarFecha = (fechaStr) => {
+    if (!fechaStr) return '';
+    return String(fechaStr).split('T')[0];
+  };
+
   const formatoPesos = (valor) => new Intl.NumberFormat('es-CO', { 
     style: 'currency', 
     currency: 'COP', 
     minimumFractionDigits: 0 
   }).format(valor || 0);
 
-  // Función interna para dar formato de pesos dinámico mientras el usuario escribe
-  const formatearMascaraMoneda = (valorRaw) => {
-    const numeroLimpio = String(valorRaw).replace(/\D/g, "");
-    if (!numeroLimpio) return "";
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0
-    }).format(numeroLimpio);
-  };
-
-  // Cálculo automático del monto total (Cantidad x Precio Unitario)
+  // 🧮 Cálculo automático en tiempo real de Subtotal, IVA y Monto Total
   useEffect(() => {
-    const total = (parseFloat(gastoForm.cantidad) || 0) * (parseFloat(gastoForm.precio_unitario) || 0);
-    if (total !== parseFloat(gastoForm.monto)) {
-      setGastoForm(prev => ({ ...prev, monto: total }));
-    }
-  }, [gastoForm.cantidad, gastoForm.precio_unitario, setGastoForm]);
+    const cant = parseFloat(gastoForm.cantidad) || 1;
+    const precio = parseFloat(gastoForm.precio_unitario) || 0;
+    const subtotal = cant * precio;
+    const porcIva = parseFloat(gastoForm.porcentaje_iva) || 0;
+    const valorIva = (subtotal * porcIva) / 100;
+    const montoTotal = subtotal + valorIva;
 
-  // ⚡ INTERCEPTOR MANUAL MODIFICADO: Autocompleta tanto la Forma de Pago como el Número de Cuenta editable
+    if (subtotal !== gastoForm.subtotal || valorIva !== gastoForm.valor_iva || montoTotal !== gastoForm.monto) {
+      setGastoForm(prev => ({
+        ...prev,
+        subtotal,
+        valor_iva: valorIva,
+        monto: montoTotal
+      }));
+    }
+  }, [gastoForm.cantidad, gastoForm.precio_unitario, gastoForm.porcentaje_iva, setGastoForm]);
+
+  // 🔄 Selección de proveedor con autocompletado original de banco y cuenta
   const handleCambioProveedor = (idSeleccionado) => {
     const prov = listaProveedores?.find(p => p.id?.toString() === idSeleccionado?.toString());
     
     setGastoForm(prev => ({
       ...prev,
       proveedor_id: idSeleccionado,
-      // Autocompleta el banco predeterminado si existe
-      forma_pago: (!prev.id_editando && prov && prov.banco) ? prov.banco : 'Efectivo',
-      // Autocompleta el número de cuenta/llave en el formulario para que sea editable
-      numero_cuenta: prov ? (prov.numero_cuenta || '') : ''
+      nombre_proveedor: prov ? (prov.nombre || prov.nombre_completo || '') : '',
+      nit_cc: prov ? (prov.nit || prov.nit_cc || '') : '',
+      direccion: prov ? (prov.dir || prov.direccion || '') : '',
+      telefono: prov ? (prov.tel || prov.telefono || '') : '',
+      forma_pago: (!prev.id_editando && prov && prov.banco) ? prov.banco : prev.forma_pago,
+      numero_cuenta: prov ? (prov.numero_cuenta || '') : prev.numero_cuenta
     }));
+    setErrores(prev => ({ ...prev, proveedor: null }));
   };
 
-  // Preparar edición cargando los datos al formulario izquierdo
-  const prepararEdicion = (g) => {
-    setGastoForm({
-      id_editando: g.id,
-      invernadero_id: g.invernadero_id || '',
-      descripcion: g.descripcion || '',
-      monto: g.monto || 0,
-      categoria: g.categoria || 'Insumo Agricola',
-      proveedor_id: g.proveedor_id || '',
-      numero_comprobante: g.numero_comprobante || '',
-      nota: g.nota || '',
-      fecha: g.fecha_gasto || g.fecha || new Date().toISOString().split('T')[0],
-      cantidad: g.cantidad || '',
-      unidad_medida: g.unidad_medida || 'Unidad',
-      precio_unitario: g.precio_unitario || '',
-      forma_pago: g.forma_pago || 'Efectivo',
-      numero_cuenta: g.numero_cuenta || '' // 👈 Carga el número de cuenta guardado en el egreso
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  // Limpiar/Cancelar edición
-  const cancelarEdicion = () => {
+  const abrirModalNuevo = () => {
     setGastoForm({ 
       id_editando: null,
+      referencia: 'FACTURA',
       invernadero_id: '', 
       descripcion: '', 
       monto: 0, 
+      subtotal: 0,
+      porcentaje_iva: 0,
+      valor_iva: 0,
       categoria: 'Insumo Agricola', 
       proveedor_id: '', 
+      nombre_proveedor: '',
+      nit_cc: '',
+      direccion: '',
+      telefono: '',
       numero_comprobante: '', 
       nota: '', 
-      fecha: new Date().toISOString().split('T')[0], 
-      cantidad: '', 
+      fecha: obtenerFechaLocalHoy(), 
+      cantidad: 1, 
       unidad_medida: 'Unidad', 
       precio_unitario: '',
       forma_pago: 'Efectivo',
       numero_cuenta: ''
     });
+    setErrores({});
+    setModalAbierto(true);
   };
 
-  // --- FUNCIÓN PARA EXPORTAR GASTOS A EXCEL ---
+  // 🛠️ FUNCIÓN DE EDICIÓN MEJORADA PARA SOPORTAR PROVEEDORES LIBRES Y DE TELEGRAM
+  const prepararEdicionGasto = (g) => {
+    setGastoForm({ 
+      id_editando: g.id,
+      referencia: g.referencia || 'FACTURA',
+      invernadero_id: g.invernadero_id || '', 
+      descripcion: g.descripcion || '', 
+      monto: g.monto || 0, 
+      subtotal: g.subtotal || g.monto || 0,
+      porcentaje_iva: g.porcentaje_iva || 0,
+      valor_iva: g.valor_iva || 0,
+      categoria: g.categoria || 'Insumo Agricola', 
+      proveedor_id: g.proveedor_id || '', 
+      nombre_proveedor: g.nombre_proveedor || '',
+      nit_cc: g.nit_cc || '',
+      numero_comprobante: g.numero_comprobante || '', 
+      nota: g.nota || '', 
+      fecha: limpiarFecha(g.fecha || g.fecha_gasto) || obtenerFechaLocalHoy(), 
+      cantidad: g.cantidad || 1, 
+      unidad_medida: g.unidad_medida || 'Unidad', 
+      precio_unitario: g.precio_unitario || '',
+      forma_pago: g.forma_pago || 'Efectivo',
+      numero_cuenta: g.numero_cuenta || ''
+    });
+    setErrores({});
+    setModalAbierto(true);
+  };
+
+  // --- 🛑 VALIDACIÓN Y ENVÍO ---
+  const validarYGuardarGasto = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+
+    const nuevosErrores = {};
+    const fechaLimpia = (gastoForm.fecha || '').trim();
+    const comprobanteLimpio = (gastoForm.numero_comprobante || '').trim();
+    const invernaderoLimpio = (gastoForm.invernadero_id || '').toString().trim();
+    const descripcionLimpia = (gastoForm.descripcion || '').trim();
+    const cantidadNum = parseFloat(gastoForm.cantidad) || 0;
+    const precioNum = parseFloat(gastoForm.precio_unitario) || 0;
+
+    if (!fechaLimpia) nuevosErrores.fecha = "Seleccione una fecha de pago.";
+    if (!comprobanteLimpio) nuevosErrores.comprobante = "Ingrese el N° de factura.";
+    if (!invernaderoLimpio) nuevosErrores.invernadero = "Seleccione un invernadero.";
+    if (!descripcionLimpia) nuevosErrores.descripcion = "Ingrese el concepto del gasto.";
+    if (cantidadNum <= 0) nuevosErrores.cantidad = "Introduzca una cantidad válida.";
+    if (precioNum <= 0) nuevosErrores.precio = "Introduzca un precio válido.";
+
+    if (Object.keys(nuevosErrores).length > 0) {
+      setErrores(nuevosErrores);
+      return;
+    }
+
+    setErrores({});
+
+    const payload = {
+      referencia: gastoForm.referencia || 'FACTURA',
+      descripcion: descripcionLimpia.toUpperCase(),
+      categoria: gastoForm.categoria,
+      monto: gastoForm.monto || (cantidadNum * precioNum),
+      subtotal: gastoForm.subtotal || (cantidadNum * precioNum),
+      porcentaje_iva: parseFloat(gastoForm.porcentaje_iva) || 0,
+      valor_iva: gastoForm.valor_iva || 0,
+      invernadero_id: invernaderoLimpio,
+      proveedor_id: gastoForm.proveedor_id || null,
+      nombre_proveedor: gastoForm.nombre_proveedor || '',
+      nit_cc: gastoForm.nit_cc || '',
+      direccion: gastoForm.direccion || '',
+      telefono: gastoForm.telefono || '',
+      numero_comprobante: comprobanteLimpio.toUpperCase(),
+      nota: gastoForm.nota ? gastoForm.nota.trim() : null,
+      fecha: fechaLimpia,
+      cantidad: cantidadNum,
+      unidad_medida: gastoForm.unidad_medida || 'Unidad',
+      precio_unitario: precioNum,
+      forma_pago: gastoForm.forma_pago || 'Efectivo',
+      numero_cuenta: gastoForm.numero_cuenta || null
+    };
+
+    try {
+      if (gastoForm.id_editando) {
+        const { error } = await supabase.from('egresos').update(payload).eq('id', gastoForm.id_editando);
+        if (error) throw error;
+        mostrarAlerta("Gasto actualizado correctamente", "exito");
+      } else {
+        const { error } = await supabase.from('egresos').insert([payload]);
+        if (error) throw error;
+        mostrarAlerta("Gasto registrado correctamente", "exito");
+      }
+
+      setModalAbierto(false);
+      cargarTodo();
+    } catch (error) {
+      console.error("Error al guardar gasto:", error);
+      mostrarAlerta("Error al guardar gasto: " + error.message, "error");
+    }
+  };
+
+  // --- 📊 EXPORTAR A EXCEL ACTUALIZADO CON TIPO / REFERENCIA ---
   const exportarAExcel = async () => {
     if (!datosEgresos || datosEgresos.length === 0) {
       mostrarAlerta("No hay datos de gastos para exportar", "error");
@@ -113,12 +216,14 @@ export default function Gastos({
 
       worksheet.columns = [
         { header: 'FECHA GASTO', key: 'fecha', width: 15 },
+        { header: 'TIPO DOC', key: 'referencia', width: 18 },
         { header: 'COMPROBANTE N°', key: 'comprobante', width: 18 },
         { header: 'INVERNADERO', key: 'invernadero', width: 18 },
         { header: 'PROVEEDOR', key: 'proveedor', width: 25 },
         { header: 'NIT / CC', key: 'nit', width: 16 },
         { header: 'CATEGORÍA', key: 'categoria', width: 20 },
         { header: 'FORMA DE PAGO', key: 'forma_pago', width: 22 },
+        { header: 'N° CUENTA / CELULAR', key: 'cuenta', width: 20 },
         { header: 'DESCRIPCIÓN / DETALLE', key: 'descripcion', width: 35 },
         { header: 'CANTIDAD', key: 'cantidad', width: 12 },
         { header: 'UNIDAD MEDIDA', key: 'unidad', width: 16 },
@@ -133,13 +238,15 @@ export default function Gastos({
         const invernadero = g.nombre_invernadero || g.invernaderos?.nombre || 'General';
 
         worksheet.addRow({
-          fecha: g.fecha_gasto || '',
+          fecha: limpiarFecha(g.fecha || g.fecha_gasto),
+          referencia: g.referencia || 'FACTURA',
           comprobante: g.numero_comprobante || 'S/N',
           invernadero: invernadero.toUpperCase(),
           proveedor: proveedor.toUpperCase(),
           nit: nit,
           categoria: (g.categoria || 'Sin Categoría').toUpperCase(),
           forma_pago: (g.forma_pago || 'Efectivo').toUpperCase(),
+          cuenta: g.numero_cuenta || 'N/A',
           descripcion: g.descripcion || '',
           cantidad: parseFloat(g.cantidad) || 0,
           unidad: g.unidad_medida || 'Unidad',
@@ -154,7 +261,7 @@ export default function Gastos({
 
       const totalRow = worksheet.addRow({
         descripcion: 'TOTAL GENERAL DE GASTOS:',
-        monto: { formula: `=SUM(L2:L${ultimaFilaDatos})` } 
+        monto: { formula: `=SUM(N2:N${ultimaFilaDatos})` } 
       });
 
       const headerRow = worksheet.getRow(1);
@@ -173,12 +280,12 @@ export default function Gastos({
           cell.font = { name: 'Arial', size: 9 };
           if (esCebra) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEBF5FB' } }; 
           
-          if ([1, 2, 5, 7].includes(colNumber)) cell.alignment = { vertical: 'middle', horizontal: 'center' };
-          else if ([9, 11, 12].includes(colNumber)) cell.alignment = { vertical: 'middle', horizontal: 'right' };
+          if ([1, 2, 3, 6, 8, 9].includes(colNumber)) cell.alignment = { vertical: 'middle', horizontal: 'center' };
+          else if ([11, 13, 14].includes(colNumber)) cell.alignment = { vertical: 'middle', horizontal: 'right' };
           else cell.alignment = { vertical: 'middle', horizontal: 'left' };
           
-          if (colNumber === 9) cell.numFmt = '#,##0';
-          if (colNumber === 11 || colNumber === 12) cell.numFmt = '"$"#,##0';
+          if (colNumber === 11) cell.numFmt = '#,##0';
+          if (colNumber === 13 || colNumber === 14) cell.numFmt = '"$"#,##0';
         });
       });
 
@@ -192,8 +299,8 @@ export default function Gastos({
           bottom: { style: 'double', color: { argb: 'FF117097' } }
         };
 
-        if (colNumber === 8) cell.alignment = { vertical: 'middle', horizontal: 'right' }; 
-        if (colNumber === 12) {
+        if (colNumber === 10) cell.alignment = { vertical: 'middle', horizontal: 'right' }; 
+        if (colNumber === 14) {
           cell.alignment = { vertical: 'middle', horizontal: 'right' }; 
           cell.numFmt = '"$"#,##0'; 
         }
@@ -202,7 +309,7 @@ export default function Gastos({
       worksheet.autoFilter = { from: { row: 1, column: 1 }, to: { row: ultimaFilaDatos, column: worksheet.columnCount } };
       
       const buffer = await workbook.xlsx.writeBuffer();
-      const fechaHoy = new Date().toISOString().split('T')[0];
+      const fechaHoy = obtenerFechaLocalHoy();
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       saveAs(blob, `BITACORA_GASTOS_${fechaHoy}.xlsx`);
       
@@ -212,316 +319,331 @@ export default function Gastos({
     }
   };
 
-  // --- REGISTRO Y ACTUALIZACIÓN ---
-  const handleSubmit = async (e) => {
-    if (e && e.preventDefault) e.preventDefault();
-    
-    // VALIDACIÓN ABSOLUTA
-    if (!gastoForm.fecha) {
-      mostrarAlerta("La fecha de pago es obligatoria", "error");
-      return;
-    }
-    if (!gastoForm.numero_comprobante || !gastoForm.numero_comprobante.trim()) {
-      mostrarAlerta("El N° Factura / Comprobante es obligatorio", "error");
-      return;
-    }
-    if (!gastoForm.invernadero_id) {
-      mostrarAlerta("Debe asignar un invernadero o bloque al gasto", "error");
-      return;
-    }
-    if (!gastoForm.categoria) {
-      mostrarAlerta("Debe seleccionar una categoría de costo", "error");
-      return;
-    }
-    if (!gastoForm.descripcion || !gastoForm.descripcion.trim()) {
-      mostrarAlerta("El concepto o detalle del gasto es obligatorio", "error");
-      return;
-    }
-    if (!gastoForm.cantidad || parseFloat(gastoForm.cantidad) <= 0) {
-      mostrarAlerta("La cantidad debe ser un número mayor a cero", "error");
-      return;
-    }
-    if (!gastoForm.precio_unitario || parseFloat(gastoForm.precio_unitario) <= 0) {
-      mostrarAlerta("El precio unitario debe ser un número mayor a cero", "error");
-      return;
-    }
+  // 🔍 Filtrado de datos en tiempo real para la tabla moderna
+  const datosFiltrados = datosEgresos?.filter(g => {
+    const texto = busqueda.toLowerCase();
+    const prov = (g.nombre_proveedor || g.proveedores?.nombre_completo || '').toLowerCase();
+    const doc = (g.numero_comprobante || '').toLowerCase();
+    const desc = (g.descripcion || '').toLowerCase();
+    const cat = (g.categoria || '').toLowerCase();
+    const ref = (g.referencia || '').toLowerCase();
+    return prov.includes(texto) || doc.includes(texto) || desc.includes(texto) || cat.includes(texto) || ref.includes(texto);
+  }) || [];
 
-    const payload = {
-      invernadero_id: gastoForm.invernadero_id,
-      descripcion: gastoForm.descripcion.toUpperCase().trim(),
-      monto: parseFloat(gastoForm.monto) || 0,
-      categoria: gastoForm.categoria,
-      proveedor_id: gastoForm.proveedor_id || null,
-      numero_comprobante: gastoForm.numero_comprobante.toUpperCase().trim(),
-      nota: gastoForm.nota ? gastoForm.nota.trim() : null,
-      fecha_gasto: gastoForm.fecha,
-      cantidad: parseFloat(gastoForm.cantidad) || 0,
-      unidad_medida: gastoForm.unidad_medida,
-      precio_unitario: parseFloat(gastoForm.precio_unitario) || 0,
-      forma_pago: gastoForm.forma_pago || 'Efectivo',
-      numero_cuenta: gastoForm.numero_cuenta || null // 👈 Guarda la cuenta digitada en el egreso
-    };
-
-    try {
-      if (gastoForm.id_editando) {
-        const { error } = await supabase
-          .from('egresos')
-          .update(payload)
-          .eq('id', gastoForm.id_editando);
-
-        if (error) throw error;
-        mostrarAlerta("Gasto actualizado correctamente en bitácora", "exito");
-      } else {
-        const { error } = await supabase
-          .from('egresos')
-          .insert([payload]);
-
-        if (error) throw error;
-        mostrarAlerta("Gasto registrado correctamente en bitácora", "exito");
-      }
-
-      cancelarEdicion();
-      cargarTodo();
-    } catch (err) {
-      mostrarAlerta("Error al guardar: " + err.message, "error");
-    }
-  };
+  const totalFiltrado = datosFiltrados.reduce((acc, g) => acc + (parseFloat(g.monto) || 0), 0);
 
   return (
-    <div className="space-y-6 pb-20 text-slate-800">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* COLUMNA IZQUIERDA: FORMULARIO DE REGISTRO REORGANIZADO */}
-        <div className="bg-white p-6 rounded-3xl shadow-xl border-t-8 border-[#117097] h-fit">
-          <div className="flex justify-between items-center mb-5 border-b pb-3">
-            <h3 className="font-black text-slate-800 uppercase text-xs italic">
-              {gastoForm.id_editando ? "✏️ Editar Egreso" : "💸 Nuevo Egreso"}
-            </h3>
-            <div className="text-right">
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">Total Gasto</p>
-              <p className="text-lg font-black text-[#117097]">{formatoPesos(gastoForm.monto)}</p>
-            </div>
+    <div className="space-y-6 pb-20 text-slate-800 dark:text-slate-200 font-sans transition-colors duration-300">
+      
+      {/* 🚀 CABECERA PRINCIPAL MODERNA */}
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row justify-between items-center gap-4 transition-colors duration-300">
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl p-2 bg-[#117097]/10 dark:bg-sky-500/20 rounded-xl text-[#117097] dark:text-sky-400">📑</span>
+            <h2 className="text-xl font-black tracking-tight text-slate-900 dark:text-white uppercase">Control de Gastos y Facturación</h2>
           </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            
-            {/* FILA SUPERIOR: FECHA + COMPROBANTE */}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[10px] font-bold text-gray-400 uppercase px-1 italic">Fecha de Pago</label>
-                <input type="date" className="w-full border-2 p-2.5 rounded-xl font-bold text-xs outline-none focus:border-[#117097]" 
-                  value={gastoForm.fecha} onChange={e => setGastoForm({...gastoForm, fecha: e.target.value})} />
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-[#117097] uppercase px-1 italic">N° Factura / Comp.</label>
-                <input className="w-full border-2 border-sky-100 p-2.5 rounded-xl font-black text-xs text-[#117097] outline-none focus:border-[#117097] uppercase" 
-                  value={gastoForm.numero_comprobante} onChange={e => setGastoForm({...gastoForm, numero_comprobante: e.target.value})} placeholder="FAC-123" />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase px-1 italic">Invernadero Asignado</label>
-              <select className="w-full border-2 p-2.5 rounded-xl bg-white font-bold text-xs outline-none focus:border-[#117097]" 
-                value={gastoForm.invernadero_id} onChange={e => setGastoForm({...gastoForm, invernadero_id: e.target.value})}>
-                <option value="">Seleccionar bloque...</option>
-                {listaInvernaderos?.filter(inv => inv.activo !== false).map(i => <option key={i.id} value={i.id}>{i.nombre}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase px-1 italic">Categoría</label>
-              <select className="w-full border-2 p-2.5 rounded-xl bg-white font-bold text-xs outline-none focus:border-[#117097]" 
-                value={gastoForm.categoria} onChange={e => setGastoForm({...gastoForm, categoria: e.target.value})}>
-                {categorias.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase px-1 italic">Concepto / Detalle del Gasto</label>
-              <input placeholder="Ej: Compra de abono" className="w-full border-2 p-2.5 rounded-xl font-bold text-sm outline-none focus:border-[#117097]" 
-                value={gastoForm.descripcion} onChange={e => setGastoForm({...gastoForm, descripcion: e.target.value})} />
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase px-1 italic">Proveedor / Beneficiario</label>
-              <select className="w-full border-2 p-2.5 rounded-xl bg-white font-bold text-xs outline-none focus:border-[#117097]" 
-                value={gastoForm.proveedor_id} onChange={e => handleCambioProveedor(e.target.value)}>
-                <option value="">Particular / Otros</option>
-                {listaProveedores?.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-              </select>
-            </div>
-
-            {/* FORMA DE PAGO + 🛠️ CUADRO ROJO EVOLUCIONADO: AHORA ES UN INPUT EDITABLE[cite: 7] */}
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase px-1 italic">Forma de Pago Efectiva y Cuenta</label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <select className="w-full border-2 p-2.5 rounded-xl bg-white font-bold text-xs text-[#117097] outline-none focus:border-[#117097]" 
-                  value={gastoForm.forma_pago || 'Efectivo'} onChange={e => setGastoForm({...gastoForm, forma_pago: e.target.value})}>
-                  {formasPago.map(fp => <option key={fp} value={fp}>{fp}</option>)}
-                </select>
-                
-                {/* 📝 TU CUADRO ROJO AHORA ES INPUT TEMPORAL: Te permite sobreescribir la cuenta al vuelo[cite: 7] */}
-                <input 
-                  type="text"
-                  className="w-full border-2 border-dashed border-amber-300 p-2.5 rounded-xl bg-amber-50/40 text-center font-black text-xs text-[#117097] tracking-tight outline-none focus:border-[#117097] focus:border-solid"
-                  value={gastoForm.numero_cuenta || ''} 
-                  onChange={e => setGastoForm({...gastoForm, numero_cuenta: e.target.value})} 
-                  placeholder="N° Cuenta / Celular"
-                />
-              </div>
-            </div>
-
-            {/* CUADRO TÉCNICO INTERNO CON TOTALIZADOR EN TIEMPO REAL */}
-            <div className="bg-slate-50 p-3 rounded-2xl border-2 border-slate-100 space-y-3 shadow-inner">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[9px] font-black text-slate-500 uppercase px-1">Cantidad</label>
-                  <input type="number" className="w-full p-2 border-2 bg-white rounded-xl outline-none text-xs font-black text-slate-700 focus:border-[#117097]" 
-                    value={gastoForm.canvas || gastoForm.cantidad} onChange={e => setGastoForm({...gastoForm, cantidad: e.target.value})} placeholder="0" />
-                </div>
-                <div>
-                  <label className="text-[9px] font-black text-slate-500 uppercase px-1">U. Medida</label>
-                  <select className="w-full p-2 border-2 bg-white rounded-xl outline-none text-xs font-bold focus:border-[#117097]" 
-                    value={gastoForm.unidad_medida} onChange={e => setGastoForm({...gastoForm, unidad_medida: e.target.value})}>
-                    {unidades.map(u => <option key={u} value={u}>{u}</option>)}
-                  </select>
-                </div>
-              </div>
-              
-              {/* PRECIO UNITARIO */}
-              <div>
-                <label className="text-[9px] font-black text-slate-500 uppercase px-1">Precio Unitario (COP)</label>
-                <input 
-                  type="text" 
-                  className="w-full p-2 border-2 bg-white rounded-xl outline-none text-xs font-black text-[#117097] focus:border-[#117097]" 
-                  value={formatearMascaraMoneda(gastoForm.precio_unitario)} 
-                  onChange={e => setGastoForm({...gastoForm, precio_unitario: e.target.value.replace(/\D/g, "")})} 
-                  placeholder="$ 0" 
-                />
-              </div>
-
-              {/* MONTO CALCULADO OPERACIÓN */}
-              <div className="pt-2 border-t border-slate-200">
-                <label className="text-[9px] font-black text-slate-400 uppercase px-1 italic">Monto Evaluado Operación</label>
-                <div className="w-full p-2.5 bg-white border rounded-xl font-black text-sm text-slate-800 tracking-wider text-center shadow-sm">
-                  {formatoPesos(gastoForm.monto)}
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase px-1 italic">Notas Adicionales</label>
-              <input className="w-full border-2 p-2.5 rounded-xl font-bold text-xs outline-none focus:border-[#117097]" 
-                value={gastoForm.nota} onChange={e => setGastoForm({...gastoForm, nota: e.target.value})} placeholder="Observaciones..." />
-            </div>
-
-            {/* BOTONES DE CONTROL DE FORMULARIO */}
-            <div className="flex gap-2">
-              {gastoForm.id_editando && (
-                <button type="button" onClick={cancelarEdicion} className="w-1/3 bg-gray-500 text-white font-black py-3.5 rounded-xl shadow-md hover:bg-gray-600 transition-colors uppercase tracking-wider text-xs">
-                  Cancelar
-                </button>
-              )}
-              <button type="submit" className={`flex-1 ${gastoForm.id_editando ? 'bg-amber-600 hover:bg-amber-700' : 'bg-[#117097] hover:bg-[#0a4c68]'} text-white font-black py-3.5 rounded-xl shadow-md transition-colors uppercase tracking-wider text-xs`}>
-                {gastoForm.id_editando ? "💾 Guardar Cambios" : "🚀 Registrar Egreso"}
-              </button>
-            </div>
-          </form>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Registro de egresos y facturas electrónicas de proveedores en INTEPE.</p>
         </div>
+        
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <button onClick={exportarAExcel} className="flex-1 md:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer">
+            <span>📊</span> Exportar Excel
+          </button>
+          <button onClick={abrirModalNuevo} className="flex-1 md:flex-none px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer">
+            <span>+</span> Registrar Gasto
+          </button>
+        </div>
+      </div>
 
-        {/* COLUMNA DERECHA: TABLA HISTÓRICA */}
-        <div className="lg:col-span-2 bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-200">
-          <div className="p-4 bg-slate-800 text-white font-black text-xs uppercase tracking-widest italic flex justify-between items-center">
-            <span>Historial Detallado de Gastos</span>
-            <button
-              onClick={exportarAExcel}
-              className="px-3 py-1 bg-emerald-600 text-white font-black rounded-lg shadow-md hover:bg-emerald-700 transition-colors flex items-center gap-1 text-[10px] uppercase tracking-wider"
-            >
-              📊 EXPORTAR A EXCEL TOTAL REGISTRO DE GASTOS
-            </button>
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-[11px] border-collapse">
-              <thead>
-                <tr className="bg-gray-300 text-slate-800 uppercase font-black">
-                  <th className="p-4 border-b-2 border-gray-400">Fecha / Factura</th>
-                  <th className="p-4 border-b-2 border-gray-400">Invernadero</th>
-                  <th className="p-4 border-b-2 border-gray-400">Concepto / Categoría</th>
-                  <th className="p-4 border-b-2 border-gray-400 text-center">Forma de Pago</th>
-                  <th className="p-4 border-b-2 border-gray-400 text-center">Detalle</th>
-                  <th className="p-4 border-b-2 border-gray-400 text-right">Monto</th>
-                  <th className="p-4 border-b-2 border-gray-400 text-center">Acciones</th>
+      {/* 🔍 BARRA DE BÚSQUEDA Y TOTALES */}
+      <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-md border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row justify-between items-center gap-4 transition-colors duration-300">
+        <div className="relative w-full md:w-96">
+          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">🔍</span>
+          <input 
+            type="text" 
+            placeholder="Buscar por factura, proveedor, concepto..." 
+            className="w-full bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 text-xs text-slate-800 dark:text-white rounded-xl pl-10 pr-4 py-2.5 outline-none focus:border-[#117097] dark:focus:border-sky-500 font-bold placeholder-slate-400"
+            value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+          />
+        </div>
+        <div className="text-right w-full md:w-auto bg-sky-50 dark:bg-sky-950/40 px-5 py-2 rounded-xl border border-sky-100 dark:border-sky-900">
+          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Filtrado</p>
+          <p className="text-base font-black text-[#117097] dark:text-sky-400 tracking-tight">{formatoPesos(totalFiltrado)}</p>
+        </div>
+      </div>
+
+      {/* 📊 TABLA DE GASTOS ESTILO MODERNO */}
+      <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-700 transition-colors duration-300">
+        <div className="overflow-x-auto max-h-[600px]">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="bg-slate-100 dark:bg-slate-700/80 text-slate-700 dark:text-slate-300 uppercase font-black text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-700 sticky top-0">
+                <th className="p-4">Fecha / Factura</th>
+                <th className="p-4 text-center">Invernadero</th>
+                <th className="p-4">Concepto / Categoría</th>
+                <th className="p-4 text-center">Ref / Tipo</th>
+                <th className="p-4">Proveedor / Beneficiario</th>
+                <th className="p-4 text-center">Forma de Pago</th>
+                <th className="p-4 text-right">Monto Total</th>
+                <th className="p-4 text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60 font-bold text-slate-700 dark:text-slate-300">
+              {datosFiltrados.length === 0 ? (
+                <tr>
+                  <td colSpan="8" className="p-8 text-center text-slate-400 dark:text-slate-500 font-bold italic">No se encontraron registros de gastos.</td>
                 </tr>
-              </thead>
-              <tbody className="divide-y-2 divide-gray-400">
-                {datosEgresos?.sort((a, b) => b.id - a.id).map((g, index) => {
+              ) : (
+                datosFiltrados.map((g, index) => {
+                  const nombreProveedor = g.nombre_proveedor || g.proveedores?.nombre_completo || g.proveedores?.nombre || 'Particular / Otros';
                   return (
-                    <tr key={g.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-gray-100'} hover:bg-sky-50 transition-colors border-l-8 border-[#117097]`}>
-                      <td className="p-4">
-                        <div className="font-black text-slate-900">{g.fecha_gasto}</div>
-                        <div className="text-[10px] text-[#117097] font-black mt-0.5">{g.numero_comprobante ? `DOC: ${g.numero_comprobante.toUpperCase()}` : 'S/N'}</div>
+                    <tr key={g.id} className={`${index % 2 === 0 ? 'bg-white dark:bg-slate-800' : 'bg-slate-50/50 dark:bg-slate-800/60'} hover:bg-sky-50/50 dark:hover:bg-slate-700/50 transition-colors border-l-8 border-[#117097] dark:border-sky-600`}>
+                      <td className="p-4 whitespace-nowrap">
+                        <div className="font-black text-slate-900 dark:text-white">{limpiarFecha(g.fecha || g.fecha_gasto)}</div>
+                        <div className="text-[10px] text-[#117097] dark:text-sky-400 font-black mt-0.5">{g.numero_comprobante ? `DOC: ${g.numero_comprobante.toUpperCase()}` : 'S/N'}</div>
                       </td>
-                      <td className="p-4">
+                      <td className="p-4 text-center whitespace-nowrap">
                         <span className="bg-slate-700 text-white px-2 py-0.5 rounded text-[9px] font-black uppercase shadow-sm">
                           {g.invernaderos?.nombre || 'Gral'}
                         </span>
                       </td>
-                      <td className="p-4 font-bold text-slate-800">
-                        <p className="uppercase">{g.descripcion}</p>
-                        <p className="text-[9px] text-[#117097] font-black uppercase italic mt-0.5">📌 {g.categoria || 'Varios'}</p>
+                     <td className="p-4 font-bold text-slate-800 dark:text-slate-200 max-w-[300px] whitespace-normal break-words">
+                        <p className="uppercase font-black text-slate-900 dark:text-white leading-snug">{g.descripcion}</p>
+                        <p className="text-[9px] text-[#117097] dark:text-sky-400 font-black uppercase italic mt-1">📌 {g.categoria || 'Varios'}</p>
                       </td>
-                      <td className="p-4 text-center font-bold">
+                      <td className="p-4 text-center whitespace-nowrap">
+                        <span className="bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 px-2 py-1 rounded-md text-[9px] font-black uppercase shadow-sm">
+                          {g.referencia || 'FACTURA'}
+                        </span>
+                      </td>
+                      <td className="p-4 font-bold text-slate-700 dark:text-slate-300">
+                        <p className="uppercase text-xs font-black text-slate-800 dark:text-white">{nombreProveedor}</p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">NIT: {g.nit_cc || 'S/N'}</p>
+                      </td>
+                      <td className="p-4 text-center whitespace-nowrap">
                         <span className={`inline-block px-2 py-0.5 rounded text-[8px] uppercase tracking-wider font-black shadow-sm ${
                           g.forma_pago === 'Efectivo' 
-                            ? 'bg-emerald-100 text-emerald-800' 
+                            ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400' 
                             : g.forma_pago?.toLowerCase().includes('bre-b') 
-                            ? 'bg-cyan-100 text-cyan-800 border border-cyan-200' 
+                            ? 'bg-cyan-100 dark:bg-cyan-950/80 text-cyan-800 dark:text-cyan-400 border border-cyan-200 dark:border-cyan-800' 
                             : g.forma_pago?.toLowerCase().includes('nequi') 
-                            ? 'bg-purple-100 text-purple-800' 
+                            ? 'bg-purple-100 dark:bg-purple-950/80 text-purple-800 dark:text-purple-400' 
                             : g.forma_pago?.toLowerCase().includes('daviplata')
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-blue-100 text-blue-800'
+                            ? 'bg-red-100 dark:bg-red-950/80 text-red-800 dark:text-red-400'
+                            : 'bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-400'
                         }`}>
                           {g.forma_pago?.toLowerCase().includes('bre-b') ? '⚡ Bre-B' : `${g.forma_pago || 'Efectivo'}`}
                         </span>
-                        
-                        {/* 🔒 HISTORIAL BLINDADO: Lee y pinta directamente la cuenta que quedó asentada en el egreso individual */}
                         {g.forma_pago !== 'Efectivo' && g.numero_cuenta && (
-                          <p className="text-[9px] text-slate-500 font-black tracking-tight mt-1 bg-slate-50 border border-slate-200 rounded px-1 py-0.5 max-w-[110px] mx-auto truncate" title={g.numero_cuenta}>
+                          <p className="text-[9px] text-slate-500 dark:text-slate-400 font-black tracking-tight mt-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded px-1.5 py-0.5 max-w-[120px] mx-auto truncate" title={g.numero_cuenta}>
                             #{g.numero_cuenta}
                           </p>
                         )}
                       </td>
-                      <td className="p-4 text-center">
-                        <div className="font-black text-slate-800">{g.cantidad} {g.unidad_medida}</div>
-                        <div className="text-[9px] text-slate-400 font-bold">{formatoPesos(g.precio_unitario)} c/u</div>
-                      </td>
-                      <td className="p-4 text-right font-black text-[#117097] text-[12px]">
+                      <td className="p-4 text-right font-black text-[#117097] dark:text-sky-400 text-sm whitespace-nowrap">
                         {formatoPesos(g.monto)}
                       </td>
-                      <td className="p-4">
+                      <td className="p-4 whitespace-nowrap">
                         <div className="flex gap-1.5 justify-center">
-                          <button onClick={() => prepararEdicion(g)} className="px-2 py-1 bg-slate-700 text-white rounded-lg hover:bg-slate-900 transition-colors flex items-center gap-1 border border-slate-800 shadow-md">
-                            <span className="text-[11px]">✏️</span><span className="text-[9px] font-black tracking-wider">EDITAR</span>
+                          <button onClick={() => prepararEdicionGasto(g)} className="px-2.5 py-1 bg-slate-700 dark:bg-slate-600 text-white rounded-lg hover:bg-slate-900 dark:hover:bg-slate-500 transition-colors flex items-center gap-1 border border-slate-800 dark:border-slate-500 shadow-md text-[9px] font-black cursor-pointer" title="Editar">
+                            <span>✏️</span><span>EDITAR</span>
                           </button>
-                          <button onClick={() => imprimirGastoPDF(g)} className="px-2 py-1 bg-slate-800 text-white rounded-lg hover:bg-black transition-colors flex items-center gap-1 border border-slate-900 shadow-md">
-                            <span className="text-[11px]">🖨️</span><span className="text-[9px] font-black tracking-wider">PDF</span>
+                          <button onClick={() => imprimirGastoPDF(g)} className="px-2.5 py-1 bg-slate-800 dark:bg-slate-700 text-white rounded-lg hover:bg-black dark:hover:bg-slate-600 transition-colors flex items-center gap-1 border border-slate-900 dark:border-slate-600 shadow-md text-[9px] font-black cursor-pointer" title="Imprimir PDF">
+                            <span>🖨️</span><span>PDF</span>
                           </button>
-                          <button onClick={() => eliminarGasto(g.id)} className="p-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-700 hover:text-white transition-colors border border-red-200">
+                          <button onClick={() => eliminarGasto(g.id)} className="p-1.5 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-700 hover:text-white transition-colors border border-red-200 dark:border-red-900 cursor-pointer" title="Eliminar">
                             🗑️
                           </button>
                         </div>
                       </td>
                     </tr>
                   );
-                })}
-              </tbody>
-            </table>
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 🧊 MODAL FLOTANTE PARA NUEVO / EDITAR GASTO */}
+      {modalAbierto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 my-8 text-slate-800 dark:text-slate-200">
+            
+            <div className="p-5 bg-slate-900 text-white border-b border-slate-800 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <span className="text-xl">📑</span>
+                <div>
+                  <h3 className="text-base font-black uppercase tracking-tight">
+                    {gastoForm.id_editando ? "Editar Registro de Gasto" : "Nuevo Registro de Gasto"}
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-medium">Información contable y de proveedores en INTEPE.</p>
+                </div>
+              </div>
+              <button onClick={() => setModalAbierto(false)} className="text-slate-400 hover:text-white text-lg font-black px-3 py-1 rounded-xl bg-slate-800 cursor-pointer">✕</button>
+            </div>
+
+            <form onSubmit={validarYGuardarGasto} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Referencia (Tipo) *</label>
+                  <select className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-white p-2.5 rounded-xl outline-none focus:border-[#117097] font-bold mt-1"
+                    value={gastoForm.referencia || 'FACTURA'} onChange={e => setGastoForm({...gastoForm, referencia: e.target.value})}>
+                    {referencias.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">N° Doc / Factura *</label>
+                  <input type="text" placeholder="Ej. FE-1042" 
+                    className={`w-full bg-slate-50 dark:bg-slate-900 border ${errores.comprobante ? 'border-red-500 bg-red-50 dark:bg-red-950/50' : 'border-slate-200 dark:border-slate-700'} text-xs text-slate-800 dark:text-white p-2.5 rounded-xl outline-none focus:border-[#117097] font-bold mt-1 uppercase placeholder-slate-400`}
+                    value={gastoForm.numero_comprobante || ''} onChange={e => { setGastoForm({...gastoForm, numero_comprobante: e.target.value}); setErrores({...errores, comprobante: null}); }} />
+                  {errores.comprobante && <p className="text-[9px] text-red-500 font-bold mt-1">{errores.comprobante}</p>}
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Fecha de Emisión *</label>
+                  <input type="date" 
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-white p-2.5 rounded-xl outline-none focus:border-[#117097] font-bold mt-1"
+                    value={gastoForm.fecha || obtenerFechaLocalHoy()} onChange={e => setGastoForm({...gastoForm, fecha: e.target.value})} />
+                </div>
+              </div>
+
+              {/* 👥 SELECCIÓN DE PROVEEDOR ORIGINAL CON AUTOCOMPLETADO */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Proveedor / Beneficiario *</label>
+                  <select className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-white p-2.5 rounded-xl outline-none focus:border-[#117097] font-bold mt-1"
+                    value={gastoForm.proveedor_id || ''} onChange={e => handleCambioProveedor(e.target.value)}>
+                    <option value="">{gastoForm.nombre_proveedor ? `Registrado: ${gastoForm.nombre_proveedor}` : 'Particular / Otros'}</option>
+                    {listaProveedores?.map(p => <option key={p.id} value={p.id}>{p.nombre || p.nombre_completo}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">NIT / CC</label>
+                  <input type="text" placeholder="NIT o Cédula" 
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-white p-2.5 rounded-xl outline-none focus:border-[#117097] font-bold mt-1 placeholder-slate-400"
+                    value={gastoForm.nit_cc || ''} onChange={e => setGastoForm({...gastoForm, nit_cc: e.target.value})} />
+                </div>
+              </div>
+
+              {/* 💳 FORMA DE PAGO Y CUENTA ORIGINALES */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Forma de Pago *</label>
+                  <select className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-white p-2.5 rounded-xl outline-none focus:border-[#117097] font-bold mt-1 text-[#117097] dark:text-sky-400" 
+                    value={gastoForm.forma_pago || 'Efectivo'} onChange={e => setGastoForm({...gastoForm, forma_pago: e.target.value})}>
+                    {formasPago.map(fp => <option key={fp} value={fp}>{fp}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">N° Cuenta / Celular</label>
+                  <input type="text" placeholder="N° Cuenta / Celular" 
+                    className="w-full bg-amber-50/40 dark:bg-amber-950/40 border border-dashed border-amber-300 dark:border-amber-700 text-xs text-[#117097] dark:text-sky-400 p-2.5 rounded-xl outline-none font-black mt-1 text-center placeholder-slate-400"
+                    value={gastoForm.numero_cuenta || ''} onChange={e => setGastoForm({...gastoForm, numero_cuenta: e.target.value})} />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Concepto / Detalle del Gasto *</label>
+                <input type="text" placeholder="Ej: Compra de abono o insumos..." 
+                  className={`w-full bg-slate-50 dark:bg-slate-900 border ${errores.descripcion ? 'border-red-500 bg-red-50 dark:bg-red-950/50' : 'border-slate-200 dark:border-slate-700'} text-xs text-slate-800 dark:text-white p-2.5 rounded-xl outline-none focus:border-[#117097] font-bold mt-1 placeholder-slate-400`}
+                  value={gastoForm.descripcion || ''} onChange={e => { setGastoForm({...gastoForm, descripcion: e.target.value}); setErrores({...errores, descripcion: null}); }} />
+                {errores.descripcion && <p className="text-[9px] text-red-500 font-bold mt-1">{errores.descripcion}</p>}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Invernadero Asignado *</label>
+                  <select className={`w-full bg-slate-50 dark:bg-slate-900 border ${errores.invernadero ? 'border-red-500 bg-red-50 dark:bg-red-950/50' : 'border-slate-200 dark:border-slate-700'} text-xs text-slate-800 dark:text-white p-2.5 rounded-xl outline-none focus:border-[#117097] font-bold mt-1`}
+                    value={gastoForm.invernadero_id || ''} onChange={e => { setGastoForm({...gastoForm, invernadero_id: e.target.value}); setErrores({...errores, invernadero: null}); }}>
+                    <option value="">Seleccionar bloque...</option>
+                    {listaInvernaderos?.filter(i => i.activo !== false).map(i => <option key={i.id} value={i.id}>{i.nombre}</option>)}
+                  </select>
+                  {errores.invernadero && <p className="text-[9px] text-red-500 font-bold mt-1">{errores.invernadero}</p>}
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Categoría *</label>
+                  <select className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-white p-2.5 rounded-xl outline-none focus:border-[#117097] font-bold mt-1"
+                    value={gastoForm.categoria || 'Insumo Agricola'} onChange={e => setGastoForm({...gastoForm, categoria: e.target.value})}>
+                    {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* 🧮 BLOQUE DE MONTOS, CANTIDAD E IVA */}
+              <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3 shadow-inner">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase">Cantidad *</label>
+                    <input type="number" min="1" 
+                      className={`w-full bg-white dark:bg-slate-800 border ${errores.cantidad ? 'border-red-500 bg-red-50 dark:bg-red-950/50' : 'border-slate-200 dark:border-slate-700'} text-xs text-slate-800 dark:text-white p-2 rounded-xl font-black mt-1 outline-none`}
+                      value={gastoForm.cantidad || 1} onChange={e => { setGastoForm({...gastoForm, cantidad: e.target.value}); setErrores({...errores, cantidad: null}); }} />
+                    {errores.cantidad && <p className="text-[9px] text-red-500 font-bold mt-1">{errores.cantidad}</p>}
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase">Unidad de Medida</label>
+                    <select className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-white p-2 rounded-xl font-bold mt-1 outline-none"
+                      value={gastoForm.unidad_medida || 'Unidad'} onChange={e => setGastoForm({...gastoForm, unidad_medida: e.target.value})}>
+                      {unidades.map(u => <option key={u} value={u}>{u}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase">Valor Unitario ($) *</label>
+                    <input type="number" placeholder="0" 
+                      className={`w-full bg-white dark:bg-slate-800 border ${errores.precio ? 'border-red-500 bg-red-50 dark:bg-red-950/50' : 'border-slate-200 dark:border-slate-700'} text-xs text-[#117097] dark:text-sky-400 p-2 rounded-xl font-black mt-1 outline-none placeholder-slate-400`}
+                      value={gastoForm.precio_unitario || ''} onChange={e => { setGastoForm({...gastoForm, precio_unitario: e.target.value}); setErrores({...errores, precio: null}); }} />
+                    {errores.precio && <p className="text-[9px] text-red-500 font-bold mt-1">{errores.precio}</p>}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase">% IVA</label>
+                    <select className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-white p-2 rounded-xl font-bold mt-1 outline-none"
+                      value={gastoForm.porcentaje_iva || 0} onChange={e => setGastoForm({...gastoForm, porcentaje_iva: e.target.value})}>
+                      <option value="0">0%</option>
+                      <option value="5">5%</option>
+                      <option value="19">19%</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase">Valor IVA ($)</label>
+                    <input type="text" readOnly 
+                      className="w-full bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-400 p-2 rounded-xl font-black mt-1 outline-none cursor-not-allowed"
+                      value={formatoPesos(gastoForm.valor_iva)} />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-black text-[#117097] dark:text-sky-400 uppercase">Monto Total ($)</label>
+                    <input type="text" readOnly 
+                      className="w-full bg-sky-50 dark:bg-sky-950/50 border border-sky-200 dark:border-sky-800 text-xs text-[#117097] dark:text-sky-400 p-2 rounded-xl font-black mt-1 outline-none cursor-not-allowed"
+                      value={formatoPesos(gastoForm.monto)} />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Notas Adicionales</label>
+                <textarea rows="2" placeholder="Observaciones o centro de costos..." 
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-white p-2.5 rounded-xl outline-none focus:border-[#117097] font-bold mt-1 resize-none placeholder-slate-400"
+                  value={gastoForm.nota || ''} onChange={e => setGastoForm({...gastoForm, nota: e.target.value})}></textarea>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <button type="button" onClick={() => setModalAbierto(false)} className="px-5 py-2.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-black text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer">
+                  Cancelar
+                </button>
+                <button type="submit" className="px-6 py-2.5 bg-[#117097] hover:bg-[#0a4c68] text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition-colors cursor-pointer">
+                  {gastoForm.id_editando ? "💾 Guardar Cambios" : "🚀 Registrar Egreso"}
+                </button>
+              </div>
+
+            </form>
+
           </div>
         </div>
+      )}
 
-      </div>
     </div>
   );
 }

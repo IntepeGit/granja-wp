@@ -2,13 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
 export default function ConfigCosecha({ mostrarAlerta }) {
-  // Estados para almacenar las listas de Supabase
   const [productos, setProductos] = useState([]);
   const [calidades, setCalidades] = useState([]);
   const [unidades, setUnidades] = useState([]);
   const [cargando, setCargando] = useState(false);
 
-  // Estados para los campos de texto de los nuevos registros
   const [nuevoProducto, setNuevoProducto] = useState('');
   const [nuevaCalidad, setNuevaCalidad] = useState('');
   const [nuevaUnidad, setNuevaUnidad] = useState('');
@@ -17,7 +15,6 @@ export default function ConfigCosecha({ mostrarAlerta }) {
     cargarTodosLosParametros();
   }, []);
 
-  // --- 1. CARGAR DATOS EN TIEMPO REAL DESDE SUPABASE ---
   const cargarTodosLosParametros = async () => {
     setCargando(true);
     try {
@@ -42,7 +39,6 @@ export default function ConfigCosecha({ mostrarAlerta }) {
     }
   };
 
-  // --- 2. FUNCIONES PARA AGREGAR ELEMENTOS ---
   const agregarProducto = async (e) => {
     e.preventDefault();
     if (!nuevoProducto.trim()) return;
@@ -52,7 +48,7 @@ export default function ConfigCosecha({ mostrarAlerta }) {
         .insert([{ nombre_producto: nuevoProducto.trim().toUpperCase() }]);
       
       if (error) throw error;
-      mostrarAlerta("Producto añadido", "exito");
+      mostrarAlerta("Producto añadido exitosamente", "exito");
       setNuevoProducto('');
       cargarTodosLosParametros();
     } catch (err) {
@@ -69,7 +65,7 @@ export default function ConfigCosecha({ mostrarAlerta }) {
         .insert([{ nombre_calidad: nuevaCalidad.trim().toUpperCase() }]);
       
       if (error) throw error;
-      mostrarAlerta("Calidad añadida", "exito");
+      mostrarAlerta("Calidad añadida exitosamente", "exito");
       setNuevaCalidad('');
       cargarTodosLosParametros();
     } catch (err) {
@@ -86,7 +82,7 @@ export default function ConfigCosecha({ mostrarAlerta }) {
         .insert([{ nombre_unidad: nuevaUnidad.trim().toUpperCase() }]);
       
       if (error) throw error;
-      mostrarAlerta("Unidad de medida añadida", "exito");
+      mostrarAlerta("Unidad de medida añadida exitosamente", "exito");
       setNuevaUnidad('');
       cargarTodosLosParametros();
     } catch (err) {
@@ -94,81 +90,165 @@ export default function ConfigCosecha({ mostrarAlerta }) {
     }
   };
 
-  // --- 3. FUNCIONES PARA ELIMINAR ELEMENTOS ---
   const eliminarElemento = async (tabla, id, campoNombre, valorNombre) => {
     if (!window.confirm(`¿Seguro que deseas eliminar "${valorNombre}" de las opciones?`)) return;
     try {
       const { error } = await supabase.from(tabla).delete().eq('id', id);
       if (error) throw error;
-      mostrarAlerta("Opción eliminada con éxito", "exito");
+      mostrarAlerta(`"${valorNombre}" eliminado con éxito`, "exito");
       cargarTodosLosParametros();
     } catch (err) {
-      mostrarAlerta("No se pudo eliminar. Puede estar en uso en la cosecha", "error");
+      mostrarAlerta("No se pudo eliminar. Puede estar en uso en el historial de cosechas.", "error");
     }
   };
 
   return (
-    <div className="space-y-6 pb-20">
-      <div className="bg-white p-4 rounded-2xl shadow border-l-4 border-amber-500">
-        <p className="text-xs font-bold text-slate-600 uppercase">💡 Información de Configuración</p>
-        <p className="text-[11px] text-slate-400 mt-1">Los elementos que agregues aquí aparecerán de forma inmediata como opciones desplegables dentro del formulario de Cosecha Diaria.</p>
+    <div className="space-y-6 pb-20 text-slate-800 dark:text-slate-200 font-sans transition-colors duration-300">
+      
+      {/* 🚀 CABECERA PRINCIPAL MODERNA */}
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row justify-between items-center gap-4 transition-colors duration-300">
+        <div className="space-y-1">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl p-2 bg-emerald-700/10 dark:bg-emerald-500/20 rounded-xl text-emerald-700 dark:text-emerald-400">⚙️</span>
+            <h2 className="text-xl font-black tracking-tight text-slate-900 dark:text-white uppercase">Parámetros de Cosecha</h2>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Administración de catálogos, clasificaciones y unidades de medida.</p>
+        </div>
       </div>
 
+      {/* 💡 BANNER DE INFORMACIÓN */}
+      <div className="bg-amber-50 dark:bg-amber-950/40 p-4 rounded-2xl shadow-sm border border-amber-200 dark:border-amber-800 flex gap-4 items-center transition-colors duration-300">
+        <span className="text-3xl">💡</span>
+        <div>
+          <p className="text-xs font-black text-amber-800 dark:text-amber-400 uppercase tracking-wider">Información de Configuración</p>
+          <p className="text-[11px] text-amber-700/80 dark:text-amber-300/80 mt-0.5 font-bold">
+            Los elementos que agregues aquí aparecerán de forma inmediata como opciones desplegables dentro del formulario principal de <span className="font-black underline">Cosecha Diaria</span>.
+          </p>
+        </div>
+      </div>
+
+      {/* 📊 CONTENEDOR DE LAS 3 COLUMNAS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
         {/* COLUMNA 1: PRODUCTOS */}
-        <div className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden flex flex-col justify-between">
-          <div className="p-4 bg-slate-800 text-white font-black text-xs uppercase tracking-wider italic">🍅 Catálogo de Productos</div>
-          <div className="p-4 flex-1 flex flex-col justify-between space-y-4">
+        <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[500px] transition-colors duration-300">
+          <div className="p-4 bg-slate-800 dark:bg-slate-900 text-white font-black text-xs uppercase tracking-wider flex items-center gap-2">
+            <span>🍅</span> Catálogo de Productos
+          </div>
+          <div className="p-5 flex-1 flex flex-col space-y-4">
             <form onSubmit={agregarProducto} className="flex gap-2">
-              <input type="text" className="flex-1 border-2 p-2 rounded-xl font-bold text-xs uppercase bg-gray-50 focus:bg-white" value={nuevoProducto} onChange={e => setNuevoProducto(e.target.value)} placeholder="NUEVO PRODUCTO..." required />
-              <button type="submit" className="px-3 bg-green-700 text-white font-black rounded-xl text-xs hover:bg-green-800">＋</button>
+              <input 
+                type="text" 
+                className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-2.5 rounded-xl font-bold text-xs uppercase outline-none focus:border-emerald-700 transition-colors placeholder-slate-400" 
+                value={nuevoProducto} 
+                onChange={e => setNuevoProducto(e.target.value)} 
+                placeholder="Nuevo Producto..." 
+                required 
+              />
+              <button type="submit" className="px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-lg shadow-md transition-colors cursor-pointer">
+                ＋
+              </button>
             </form>
-            <div className="max-h-60 overflow-y-auto divide-y border rounded-xl bg-gray-50">
-              {productos.map(p => (
-                <div key={p.id} className="p-2.5 flex justify-between items-center text-xs font-bold uppercase text-slate-700 bg-white">
-                  <span>{p.nombre_producto}</span>
-                  <button onClick={() => eliminarElemento('config_productos', p.id, 'nombre_producto', p.nombre_producto)} className="text-red-500 hover:text-red-700 px-1">🗑️</button>
-                </div>
-              ))}
+            
+            <div className="flex-1 overflow-y-auto pr-2 space-y-2">
+              {productos.length === 0 ? (
+                <p className="text-center text-[10px] font-bold text-slate-400 dark:text-slate-500 italic mt-4">No hay productos registrados.</p>
+              ) : (
+                productos.map(p => (
+                  <div key={p.id} className="p-3 flex justify-between items-center text-[11px] font-black uppercase text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-700 rounded-xl hover:border-emerald-200 transition-colors">
+                    <span>{p.nombre_producto}</span>
+                    <button 
+                      onClick={() => eliminarElemento('config_productos', p.id, 'nombre_producto', p.nombre_producto)} 
+                      className="p-1.5 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 hover:bg-red-600 hover:text-white rounded-lg transition-colors cursor-pointer"
+                      title="Eliminar Producto"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
 
         {/* COLUMNA 2: CALIDADES */}
-        <div className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden flex flex-col justify-between">
-          <div className="p-4 bg-slate-800 text-white font-black text-xs uppercase tracking-wider italic">⭐ Clasificación de Calidades</div>
-          <div className="p-4 flex-1 flex flex-col justify-between space-y-4">
+        <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[500px] transition-colors duration-300">
+          <div className="p-4 bg-slate-800 dark:bg-slate-900 text-white font-black text-xs uppercase tracking-wider flex items-center gap-2">
+            <span>⭐</span> Clasificación / Calidad
+          </div>
+          <div className="p-5 flex-1 flex flex-col space-y-4">
             <form onSubmit={agregarCalidad} className="flex gap-2">
-              <input type="text" className="flex-1 border-2 p-2 rounded-xl font-bold text-xs uppercase bg-gray-50 focus:bg-white" value={nuevaCalidad} onChange={e => setNuevaCalidad(e.target.value)} placeholder="NUEVA CALIDAD..." required />
-              <button type="submit" className="px-3 bg-green-700 text-white font-black rounded-xl text-xs hover:bg-green-800">＋</button>
+              <input 
+                type="text" 
+                className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-2.5 rounded-xl font-bold text-xs uppercase outline-none focus:border-emerald-700 transition-colors placeholder-slate-400" 
+                value={nuevaCalidad} 
+                onChange={e => setNuevaCalidad(e.target.value)} 
+                placeholder="Nueva Calidad..." 
+                required 
+              />
+              <button type="submit" className="px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-lg shadow-md transition-colors cursor-pointer">
+                ＋
+              </button>
             </form>
-            <div className="max-h-60 overflow-y-auto divide-y border rounded-xl bg-gray-50">
-              {calidades.map(c => (
-                <div key={c.id} className="p-2.5 flex justify-between items-center text-xs font-bold uppercase text-slate-700 bg-white">
-                  <span>{c.nombre_calidad}</span>
-                  <button onClick={() => eliminarElemento('config_calidades', c.id, 'nombre_calidad', c.nombre_calidad)} className="text-red-500 hover:text-red-700 px-1">🗑️</button>
-                </div>
-              ))}
+
+            <div className="flex-1 overflow-y-auto pr-2 space-y-2">
+              {calidades.length === 0 ? (
+                <p className="text-center text-[10px] font-bold text-slate-400 dark:text-slate-500 italic mt-4">No hay calidades registradas.</p>
+              ) : (
+                calidades.map(c => (
+                  <div key={c.id} className="p-3 flex justify-between items-center text-[11px] font-black uppercase text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-700 rounded-xl hover:border-emerald-200 transition-colors">
+                    <span>{c.nombre_calidad}</span>
+                    <button 
+                      onClick={() => eliminarElemento('config_calidades', c.id, 'nombre_calidad', c.nombre_calidad)} 
+                      className="p-1.5 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 hover:bg-red-600 hover:text-white rounded-lg transition-colors cursor-pointer"
+                      title="Eliminar Calidad"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
 
         {/* COLUMNA 3: UNIDADES DE MEDIDA */}
-        <div className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden flex flex-col justify-between">
-          <div className="p-4 bg-slate-800 text-white font-black text-xs uppercase tracking-wider italic">⚖️ Unidades de Medida</div>
-          <div className="p-4 flex-1 flex flex-col justify-between space-y-4">
+        <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-[500px] transition-colors duration-300">
+          <div className="p-4 bg-slate-800 dark:bg-slate-900 text-white font-black text-xs uppercase tracking-wider flex items-center gap-2">
+            <span>⚖️</span> Unidades de Medida
+          </div>
+          <div className="p-5 flex-1 flex flex-col space-y-4">
             <form onSubmit={agregarUnidad} className="flex gap-2">
-              <input type="text" className="flex-1 border-2 p-2 rounded-xl font-bold text-xs uppercase bg-gray-50 focus:bg-white" value={nuevaUnidad} onChange={e => setNuevaUnidad(e.target.value)} placeholder="NUEVA UNIDAD..." required />
-              <button type="submit" className="px-3 bg-green-700 text-white font-black rounded-xl text-xs hover:bg-green-800">＋</button>
+              <input 
+                type="text" 
+                className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-2.5 rounded-xl font-bold text-xs uppercase outline-none focus:border-emerald-700 transition-colors placeholder-slate-400" 
+                value={nuevaUnidad} 
+                onChange={e => setNuevaUnidad(e.target.value)} 
+                placeholder="Nueva Unidad..." 
+                required 
+              />
+              <button type="submit" className="px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-lg shadow-md transition-colors cursor-pointer">
+                ＋
+              </button>
             </form>
-            <div className="max-h-60 overflow-y-auto divide-y border rounded-xl bg-gray-50">
-              {unidades.map(u => (
-                <div key={u.id} className="p-2.5 flex justify-between items-center text-xs font-bold uppercase text-slate-700 bg-white">
-                  <span>{u.nombre_unidad}</span>
-                  <button onClick={() => eliminarElemento('config_unidades', u.id, 'nombre_unidad', u.nombre_unidad)} className="text-red-500 hover:text-red-700 px-1">🗑️</button>
-                </div>
-              ))}
+
+            <div className="flex-1 overflow-y-auto pr-2 space-y-2">
+              {unidades.length === 0 ? (
+                <p className="text-center text-[10px] font-bold text-slate-400 dark:text-slate-500 italic mt-4">No hay unidades registradas.</p>
+              ) : (
+                unidades.map(u => (
+                  <div key={u.id} className="p-3 flex justify-between items-center text-[11px] font-black uppercase text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-700 rounded-xl hover:border-emerald-200 transition-colors">
+                    <span>{u.nombre_unidad}</span>
+                    <button 
+                      onClick={() => eliminarElemento('config_unidades', u.id, 'nombre_unidad', u.nombre_unidad)} 
+                      className="p-1.5 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 hover:bg-red-600 hover:text-white rounded-lg transition-colors cursor-pointer"
+                      title="Eliminar Unidad"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

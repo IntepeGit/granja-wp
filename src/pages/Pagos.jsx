@@ -11,6 +11,11 @@ export default function Pagos({
   guardarPago, prepararEdicionPago, eliminarPago 
 }) {
 
+  // Estados locales para el modal y filtros
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [filtroClienteId, setFiltroClienteId] = useState('');
+  const [filtroDespachoId, setFiltroDespachoId] = useState('');
+
   // Estados locales para el medio de pago
   const [modoMedio, setModoMedio] = useState('Efectivo');
   const [bancoPersonalizado, setBancoPersonalizado] = useState('');
@@ -40,6 +45,17 @@ export default function Pagos({
     }
   }, [pagoForm.id_editando, pagoForm.despacho_id]);
 
+  // Si se selecciona un cliente/remisión en el filtro, actualizamos el formulario base
+  useEffect(() => {
+    if (filtroClienteId && filtroDespachoId && !pagoForm.id_editando) {
+      setPagoForm(prev => ({
+        ...prev,
+        cliente_id: filtroClienteId,
+        despacho_id: filtroDespachoId
+      }));
+    }
+  }, [filtroClienteId, filtroDespachoId]);
+
   const formatoPesos = (valor) => new Intl.NumberFormat('es-CO', { 
     style: 'currency', 
     currency: 'COP', 
@@ -56,7 +72,6 @@ export default function Pagos({
     }).format(numeroLimpio);
   };
 
-  // Manejador del cambio en el selector de Medio de Pago
   const alCambiarMedioSelect = (val) => {
     setModoMedio(val);
     if (val === 'OTRO_MANUAL') {
@@ -67,13 +82,11 @@ export default function Pagos({
     }
   };
 
-  // Manejador de la escritura manual del banco
   const alEscribirBancoOtro = (txt) => {
     setBancoPersonalizado(txt);
     setPagoForm(prev => ({ ...prev, medio_pago: txt.toUpperCase().trim() || 'OTRO BANCO' }));
   };
 
-  // Detección inteligente de medio de pago para registros anteriores
   const obtenerMedioPagoLimpio = (abono) => {
     if (abono.medio_pago && abono.medio_pago.trim() !== '') {
       return abono.medio_pago.toUpperCase();
@@ -87,7 +100,24 @@ export default function Pagos({
     return 'EFECTIVO';
   };
 
-  // ⚡ GUARDADO DIRECTO CONSERVA LA SELECCIÓN DE LA REMISIÓN
+  const abrirModalNuevo = () => {
+    setPagoForm(prev => ({
+      ...prev,
+      id_editando: null,
+      monto: '',
+      referencia: '',
+      fecha_pago: new Date().toISOString().split('T')[0],
+      cliente_id: filtroClienteId || '',
+      despacho_id: filtroDespachoId || ''
+    }));
+    setModalAbierto(true);
+  };
+
+  const abrirModalEditar = (abono) => {
+    prepararEdicionPago(abono);
+    setModalAbierto(true);
+  };
+
   const handleGuardarAbonoDirecto = async (e) => {
     e.preventDefault();
 
@@ -120,31 +150,21 @@ export default function Pagos({
 
     try {
       if (pagoForm.id_editando) {
-        const { error } = await supabase
-          .from('pagos')
-          .update(payload)
-          .eq('id', pagoForm.id_editando);
-
+        const { error } = await supabase.from('pagos').update(payload).eq('id', pagoForm.id_editando);
         if (error) throw error;
         if (mostrarAlerta) mostrarAlerta(`Abono actualizado correctamente como [${medioFinal}]`, "exito");
       } else {
-        const { error } = await supabase
-          .from('pagos')
-          .insert([payload]);
-
+        const { error } = await supabase.from('pagos').insert([payload]);
         if (error) throw error;
         if (mostrarAlerta) mostrarAlerta(`Abono registrado con éxito como [${medioFinal}]`, "exito");
       }
 
-      // 🌟 MANTENEMOS EL CLIENTE Y EL DESPACHO PARA NO PERDER LA VISTA
-      setPagoForm(prev => ({
-        ...prev,
-        monto: '',
-        referencia: '',
-        id_editando: null
-      }));
+      setFiltroClienteId(pagoForm.cliente_id);
+      setFiltroDespachoId(pagoForm.despacho_id);
 
-      // Recargamos los datos para refrescar la lista a la derecha sin cerrar la ficha
+      setPagoForm(prev => ({ ...prev, monto: '', referencia: '', id_editando: null }));
+      setModalAbierto(false); 
+
       if (cargarTodo) await cargarTodo();
 
     } catch (err) {
@@ -387,321 +407,366 @@ export default function Pagos({
     }
   };
 
-  const remisionSeleccionada = datosDespachos?.find(r => r.id?.toString() === pagoForm.despacho_id?.toString());
+  const remisionSeleccionada = datosDespachos?.find(r => r.id?.toString() === filtroDespachoId?.toString());
   const historialAbonos = datosPagos
-    ?.filter(p => p.despacho_id?.toString() === pagoForm.despacho_id?.toString())
+    ?.filter(p => p.despacho_id?.toString() === filtroDespachoId?.toString())
     .sort((a, b) => new Date(a.fecha_pago) - new Date(b.fecha_pago));
 
   const totalAbonado = historialAbonos?.reduce((acc, p) => acc + (parseFloat(p.monto) || 0), 0) || 0;
   const saldoActual = remisionSeleccionada ? (parseFloat(remisionSeleccionada.total_venta) - totalAbonado) : 0;
-  const remisionesDelCliente = datosDespachos?.filter(d => d.cliente_id?.toString() === pagoForm.cliente_id?.toString()) || [];
+  const remisionesDelCliente = datosDespachos?.filter(d => d.cliente_id?.toString() === filtroClienteId?.toString()) || [];
 
   return (
-    <div className="space-y-6 pb-20 text-slate-800">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* COLUMNA IZQUIERDA: FORMULARIO DE RECAUDO */}
-        <div className="bg-white p-6 rounded-3xl shadow-xl border-t-8 border-blue-700 h-fit space-y-5">
-          
-          <div className="flex justify-between items-center border-b pb-3">
-            <h3 className="font-black text-slate-800 uppercase text-xs italic">💳 Registro de Pagos / Abonos</h3>
+    <div className="space-y-6 pb-20 text-slate-800 dark:text-slate-200 font-sans transition-colors duration-300">
+      
+      {/* 🚀 CABECERA PRINCIPAL MODERNA */}
+      <div className="bg-white dark:bg-slate-800 p-6 rounded-3xl shadow-xl border border-slate-200 dark:border-slate-700 flex flex-col xl:flex-row justify-between items-center gap-4 transition-colors duration-300">
+        <div className="space-y-1 w-full xl:w-auto text-center xl:text-left">
+          <div className="flex items-center justify-center xl:justify-start gap-3">
+            <span className="text-2xl p-2 bg-blue-700/10 dark:bg-blue-500/20 rounded-xl text-blue-700 dark:text-blue-400">💳</span>
+            <h2 className="text-xl font-black tracking-tight text-slate-900 dark:text-white uppercase">Pagos y Cartera</h2>
           </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Registro de abonos, cuentas por cobrar y estados de cuenta.</p>
+        </div>
+        
+        {/* BOTONERA DE ACCIONES RÁPIDAS */}
+        <div className="flex items-center gap-3 flex-wrap justify-center xl:justify-end w-full xl:w-auto">
+          <button onClick={exportarPagosAExcel} className="flex-1 md:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+            <span>📊</span> Exportar Excel
+          </button>
+          <button onClick={abrirModalNuevo} disabled={!filtroDespachoId} className={`flex-1 md:flex-none px-5 py-2.5 font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 ${filtroDespachoId ? 'bg-blue-700 hover:bg-blue-800 text-white cursor-pointer' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed'}`}>
+            <span>💰</span> Registrar Abono
+          </button>
+        </div>
+      </div>
 
-          <form onSubmit={handleGuardarAbonoDirecto} className="space-y-4">
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase px-1 italic">Cliente *</label>
-              <select 
-                className="w-full border-2 p-2.5 rounded-xl font-bold text-xs bg-white outline-none focus:border-blue-500 uppercase"
-                value={pagoForm.cliente_id}
-                onChange={(e) => setPagoForm({...pagoForm, cliente_id: e.target.value, despacho_id: ''})} 
-                required
-              >
-                <option value="">Seleccione Cliente...</option>
-                {listaClientes?.filter(c => c.activo !== false).map(c => (
-                  <option key={c.id} value={c.id}>{c.nombre_completo?.toUpperCase()}</option>
-                ))}
-              </select>
-            </div>
+      {/* 🔍 BARRA DE FILTROS SUPERIOR */}
+      <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl shadow-md border border-slate-200 dark:border-slate-700 grid grid-cols-1 md:grid-cols-2 gap-4 transition-colors duration-300">
+        <div>
+          <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 block">👤 Seleccionar Cliente</label>
+          <select 
+            className="w-full bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 p-2.5 rounded-xl font-bold text-xs uppercase outline-none focus:border-blue-500 dark:text-white"
+            value={filtroClienteId}
+            onChange={(e) => {
+              setFiltroClienteId(e.target.value);
+              setFiltroDespachoId(''); 
+            }} 
+          >
+            <option value="">SELECCIONE CLIENTE PARA VER CARTERA...</option>
+            {listaClientes?.filter(c => c.activo !== false).map(c => (
+              <option key={c.id} value={c.id}>{c.nombre_completo?.toUpperCase()}</option>
+            ))}
+          </select>
+        </div>
 
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase px-1 italic">N° Remisión / Venta *</label>
-              <select 
-                className="w-full border-2 p-2.5 rounded-xl font-bold text-xs bg-white outline-none focus:border-blue-500 uppercase"
-                value={pagoForm.despacho_id}
-                onChange={(e) => setPagoForm({...pagoForm, despacho_id: e.target.value, monto: ''})}
-                disabled={!pagoForm.cliente_id} 
-                required
-              >
-                <option value="">Seleccione Remisión...</option>
-                {remisionesDelCliente.map(r => (
-                  <option key={r.id} value={r.id}>N° {r.numero_remision} - Total: {formatoPesos(r.total_venta)}</option>
-                ))}
-              </select>
-            </div>
+        <div>
+          <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 block">📄 Seleccionar N° de Remisión / Venta</label>
+          <select 
+            className="w-full bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 p-2.5 rounded-xl font-bold text-xs uppercase outline-none focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed dark:text-white"
+            value={filtroDespachoId}
+            onChange={(e) => setFiltroDespachoId(e.target.value)}
+            disabled={!filtroClienteId} 
+          >
+            <option value="">{filtroClienteId ? 'SELECCIONE LA REMISIÓN...' : 'ESPERANDO CLIENTE...'}</option>
+            {remisionesDelCliente.map(r => (
+              <option key={r.id} value={r.id}>N° {r.numero_remision} - Total: {formatoPesos(r.total_venta)}</option>
+            ))}
+          </select>
+        </div>
+      </div>
 
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase px-1 italic">Fecha Abono *</label>
-              <input 
-                type="date" 
-                className="w-full border-2 p-2.5 rounded-xl font-bold text-sm outline-none focus:border-blue-500"
-                value={pagoForm.fecha_pago}
-                onChange={(e) => setPagoForm({...pagoForm, fecha_pago: e.target.value})} 
-                required 
-              />
-            </div>
-
-            {/* SELECTOR MEDIO DE PAGO */}
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase px-1 italic">Medio / Forma de Pago *</label>
-              <select 
-                className="w-full border-2 p-2.5 rounded-xl font-bold text-xs bg-white outline-none focus:border-blue-500 uppercase"
-                value={modoMedio}
-                onChange={(e) => alCambiarMedioSelect(e.target.value)}
-                required
-              >
-                {listaMediosPredeterminados.map(m => (
-                  <option key={m} value={m}>
-                    {m === 'OTRO_MANUAL' ? '✏️ OTRO BANCO / ENTIDAD (Escribir...)' : m}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {modoMedio === 'OTRO_MANUAL' && (
-              <div className="bg-amber-50 p-2.5 rounded-xl border border-amber-300">
-                <label className="text-[9px] font-black text-amber-900 uppercase px-1 italic block mb-1">Nombre del Banco / Entidad *</label>
-                <input 
-                  type="text" 
-                  className="w-full p-2 border-2 bg-white rounded-lg font-black text-xs uppercase outline-none focus:border-amber-600 text-amber-900"
-                  placeholder="Ej: BCO BOGOTA / DAVIVIENDA"
-                  value={bancoPersonalizado}
-                  onChange={(e) => alEscribirBancoOtro(e.target.value)}
-                  required
-                />
-              </div>
-            )}
-
-            {remisionSeleccionada && (
-              <div className="bg-blue-50/50 p-3 rounded-2xl border border-blue-100 space-y-3 shadow-inner">
+      {/* 📊 FICHA DE ESTADO DE CUENTA (ANCHO COMPLETO) */}
+      <div className="w-full">
+        {remisionSeleccionada ? (
+          <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl overflow-hidden border border-gray-200 dark:border-slate-700 transition-colors duration-300">
+            
+            <div className="bg-slate-800 dark:bg-slate-900 p-5 text-white flex flex-col md:flex-row justify-between items-center gap-4">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">📄</span>
                 <div>
-                  <label className="text-[9px] font-black text-blue-700 uppercase px-1 italic">Valor del Nuevo Abono *</label>
+                  <h3 className="font-black uppercase text-base tracking-widest italic">Estado de Cuenta: Remisión N° {remisionSeleccionada.numero_remision}</h3>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">Cliente: {remisionSeleccionada.clientes?.nombre_completo}</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                {saldoActual <= 0 ? (
+                  <span className="bg-emerald-500/20 border border-emerald-500 text-emerald-400 px-3 py-1 rounded-lg text-[10px] font-black uppercase">🟢 PAGADA EN SU TOTALIDAD</span>
+                ) : totalAbonado > 0 ? (
+                  <span className="bg-amber-500/20 border border-amber-500 text-amber-400 px-3 py-1 rounded-lg text-[10px] font-black uppercase">🟡 PARCIALMENTE ABONADA</span>
+                ) : (
+                  <span className="bg-rose-500/20 border border-rose-500 text-rose-400 px-3 py-1 rounded-lg text-[10px] font-black uppercase">🔴 PENDIENTE DE PAGO</span>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* BLOQUE INFORMATIVO DE LA VENTA */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 border-b border-slate-100 dark:border-slate-700 pb-6">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Información del Despacho</p>
+                  <p className="font-black text-xl text-slate-900 dark:text-white uppercase leading-tight">{remisionSeleccionada.clientes?.nombre_completo}</p>
+                  <div className="flex gap-4 pt-1">
+                    <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase">📅 Carga: <span className="text-slate-800 dark:text-slate-200">{remisionSeleccionada.fecha_venta}</span></p>
+                    <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase">🌱 Invernadero: <span className="text-slate-800 dark:text-slate-200">{remisionSeleccionada.invernaderos?.nombre || 'GENERAL'}</span></p>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50/50 dark:bg-slate-700/50 p-4 rounded-2xl border border-blue-100 dark:border-slate-600 shadow-sm">
+                  <p className="text-[10px] font-black text-blue-700 dark:text-sky-400 uppercase mb-3 tracking-wider flex items-center gap-1.5 border-b border-blue-200/50 dark:border-slate-600 pb-1.5">
+                    <span>📦</span> Contenido Despachado
+                  </p>
+                  <div className="space-y-2">
+                    {remisionSeleccionada.detalle_ventas?.map((item, i) => (
+                      <div key={i} className="flex justify-between items-center pb-1">
+                        <p className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">{item.descripcion}</p>
+                        <p className="text-[10px] font-black text-blue-800 dark:text-sky-300 bg-blue-100/80 dark:bg-sky-950/80 px-2 py-0.5 rounded-md border border-blue-200 dark:border-sky-800">
+                          {item.amount || item.cantidad} {item.escala}
+                        </p>
+                      </div>
+                    ))}
+                    <div className="pt-3 border-t border-dashed border-blue-200 dark:border-slate-600 flex justify-between items-center">
+                      <p className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Valor Total Venta:</p>
+                      <p className="text-lg font-black text-slate-900 dark:text-white">{formatoPesos(remisionSeleccionada.total_venta)}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* TABLA DE ABONOS RECIBIDOS A ANCHO COMPLETO */}
+              <div className="space-y-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Historial de Abonos Recibidos</p>
+                
+                {historialAbonos?.length > 0 ? (
+                  <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100 dark:bg-slate-700/80 text-slate-600 dark:text-slate-300 uppercase font-black text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-700">
+                          <th className="p-4 text-center w-12">N°</th>
+                          <th className="p-4">Fecha Abono</th>
+                          <th className="p-4 text-center">Forma / Medio de Pago</th>
+                          <th className="p-4">N° Ref / Comprobante</th>
+                          <th className="p-4 text-right">Monto Abono</th>
+                          <th className="p-4 text-center">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60 font-bold text-slate-700 dark:text-slate-300">
+                        {historialAbonos.map((abono, idx) => {
+                          const medioLimpio = obtenerMedioPagoLimpio(abono);
+
+                          return (
+                            <tr key={abono.id} className={`${idx % 2 === 0 ? 'bg-white dark:bg-slate-800' : 'bg-slate-50/50 dark:bg-slate-800/60'} hover:bg-sky-50/50 dark:hover:bg-slate-700/50 transition-colors border-l-4 border-blue-500`}>
+                              <td className="p-4 text-center">
+                                <span className="bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-300 w-6 h-6 rounded-full inline-flex items-center justify-center font-black text-[10px] shadow-sm">
+                                  {idx + 1}
+                                </span>
+                              </td>
+
+                              <td className="p-4 font-black text-slate-900 dark:text-white whitespace-nowrap">
+                                {abono.fecha_pago}
+                              </td>
+
+                              <td className="p-4 text-center">
+                                <span className="bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-tight inline-block shadow-sm">
+                                  💳 {medioLimpio}
+                                </span>
+                              </td>
+
+                              <td className="p-4 uppercase text-slate-500 dark:text-slate-400 font-bold text-[10px]">
+                                {abono.referencia || abono.nota ? (
+                                  <span className="bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-2.5 py-1 rounded-md text-slate-700 dark:text-slate-200 font-black shadow-sm">
+                                    {abono.referencia || abono.nota}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-300 dark:text-slate-600 italic font-medium">Sin referencia</span>
+                                )}
+                              </td>
+
+                              <td className="p-4 text-right font-black text-blue-700 dark:text-sky-400 text-sm whitespace-nowrap">
+                                +{formatoPesos(abono.monto)}
+                              </td>
+
+                              <td className="p-4 text-center">
+                                <div className="flex gap-1.5 justify-center">
+                                  <button 
+                                    type="button"
+                                    onClick={() => abrirModalEditar(abono)}
+                                    className="p-1.5 bg-slate-700 dark:bg-slate-600 text-white rounded-lg shadow-sm border border-slate-800 hover:bg-slate-900 transition-colors text-[10px] font-black flex items-center gap-1 cursor-pointer"
+                                    title="Editar Abono"
+                                  >
+                                    <span>✏️</span> EDITAR
+                                  </button>
+                                  <button 
+                                    type="button"
+                                    onClick={() => eliminarPago(abono.id)}
+                                    className="p-1.5 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-700 hover:text-white border border-red-200 dark:border-red-900 transition-colors cursor-pointer"
+                                    title="Eliminar Abono"
+                                  >
+                                    🗑️
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700">
+                    <span className="text-3xl grayscale opacity-50 block mb-2">💸</span>
+                    <p className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Sin abonos registrados a esta remisión</p>
+                  </div>
+                )}
+              </div>
+
+              {/* BLOQUE INFERIOR DE TOTALES Y PDF */}
+              <div className="pt-4 flex flex-col md:flex-row gap-4 items-stretch md:items-end justify-between">
+                
+                <div className="bg-slate-900 dark:bg-slate-950 p-5 rounded-2xl flex-1 flex justify-between items-center text-white shadow-xl border border-slate-800">
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Recaudado</p>
+                    <p className="font-black text-xl text-blue-400 mt-0.5">{formatoPesos(totalAbonado)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Saldo Neto Pendiente</p>
+                    <p className={`font-black text-3xl mt-0.5 tracking-tight ${saldoActual <= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      {formatoPesos(saldoActual)}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => imprimirReciboCarteraPDF(remisionSeleccionada)}
+                  className="px-6 py-4 h-full bg-rose-700 hover:bg-rose-800 text-white font-black rounded-2xl shadow-xl transition-colors flex items-center justify-center gap-2 text-xs uppercase tracking-wider border border-rose-600 cursor-pointer"
+                >
+                  <span className="text-lg">🖨️</span> Imprimir PDF Remisión
+                </button>
+
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-slate-50 dark:bg-slate-800/40 border-2 border-dashed border-slate-200 dark:border-slate-700 p-16 rounded-3xl text-center flex flex-col items-center justify-center h-full min-h-[400px]">
+            <span className="text-5xl grayscale opacity-40 mb-4">📂</span>
+            <p className="text-slate-400 dark:text-slate-500 font-black uppercase text-sm tracking-widest">Seleccione un cliente y una remisión</p>
+            <p className="text-slate-400 dark:text-slate-600 text-xs mt-2 font-bold">Para cargar el desglose y su estado de cuenta de cartera</p>
+          </div>
+        )}
+      </div>
+
+      {/* 🧊 MODAL FLOTANTE PARA REGISTRAR O EDITAR ABONOS */}
+      {modalAbierto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 my-8 text-slate-800 dark:text-slate-200">
+            
+            <div className="p-5 bg-slate-900 text-white border-b border-slate-800 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <span className="text-xl">💳</span>
+                <div>
+                  <h3 className="text-base font-black uppercase tracking-tight">
+                    {pagoForm.id_editando ? 'Editar Abono Existente' : 'Registrar Nuevo Abono'}
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-medium">Asignación de pagos a la remisión N° {remisionSeleccionada?.numero_remision}</p>
+                </div>
+              </div>
+              <button onClick={() => setModalAbierto(false)} className="text-slate-400 hover:text-white text-lg font-black px-3 py-1 rounded-xl bg-slate-800 cursor-pointer">✕</button>
+            </div>
+
+            <form onSubmit={handleGuardarAbonoDirecto} className="p-6 space-y-4">
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Fecha Abono *</label>
                   <input 
-                    type="text" 
-                    className="w-full p-2.5 border-2 bg-white rounded-xl font-black text-lg text-blue-900 border-blue-200 outline-none focus:border-blue-500"
-                    value={formatearMascaraMoneda(pagoForm.monto)} 
-                    onChange={(e) => setPagoForm({...pagoForm, monto: e.target.value.replace(/\D/g, "")})} 
+                    type="date" 
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-3 rounded-xl font-bold text-sm outline-none focus:border-blue-500 mt-1"
+                    value={pagoForm.fecha_pago}
+                    onChange={(e) => setPagoForm({...pagoForm, fecha_pago: e.target.value})} 
                     required 
                   />
                 </div>
+
                 <div>
-                  <label className="text-[9px] font-black text-slate-500 uppercase px-1 italic">Saldo Pendiente Actual</label>
-                  <div className="w-full p-2 bg-white rounded-xl border-2 border-slate-200 flex items-center justify-center font-black text-sm">
-                    <p className={saldoActual <= 0 ? 'text-green-600' : 'text-red-600'}>
+                  <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">Medio / Forma de Pago *</label>
+                  <select 
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-3 rounded-xl font-bold text-xs outline-none focus:border-blue-500 uppercase mt-1"
+                    value={modoMedio}
+                    onChange={(e) => alCambiarMedioSelect(e.target.value)}
+                    required
+                  >
+                    {listaMediosPredeterminados.map(m => (
+                      <option key={m} value={m}>
+                        {m === 'OTRO_MANUAL' ? '✏️ OTRO BANCO (Escribir...)' : m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {modoMedio === 'OTRO_MANUAL' && (
+                <div className="bg-amber-50 dark:bg-amber-950/40 p-4 rounded-xl border border-amber-300 dark:border-amber-700 shadow-inner animate-in fade-in">
+                  <label className="text-[9px] font-black text-amber-900 dark:text-amber-400 uppercase tracking-wider block mb-1">Nombre del Banco / Entidad *</label>
+                  <input 
+                    type="text" 
+                    className="w-full p-2.5 bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 rounded-lg font-black text-xs uppercase outline-none focus:border-amber-600 text-amber-900 dark:text-amber-200"
+                    placeholder="Ej: BCO BOGOTA / DAVIVIENDA"
+                    value={bancoPersonalizado}
+                    onChange={(e) => alEscribirBancoOtro(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+
+              <div className="bg-blue-50/50 dark:bg-slate-700/40 p-4 rounded-2xl border border-blue-200 dark:border-slate-600 shadow-inner space-y-3">
+                <div>
+                  <label className="text-[10px] font-black text-blue-800 dark:text-sky-400 uppercase tracking-wider">Valor del Abono *</label>
+                  <input 
+                    type="text" 
+                    className="w-full p-3 bg-white dark:bg-slate-900 border-2 border-blue-200 dark:border-slate-600 rounded-xl font-black text-2xl text-blue-900 dark:text-white outline-none focus:border-blue-500 mt-1 placeholder:text-blue-200 dark:placeholder:text-slate-600"
+                    value={formatearMascaraMoneda(pagoForm.monto)} 
+                    onChange={(e) => setPagoForm({...pagoForm, monto: e.target.value.replace(/\D/g, "")})} 
+                    placeholder="$ 0"
+                    required 
+                  />
+                </div>
+                
+                {!pagoForm.id_editando && (
+                  <div className="flex justify-between items-center pt-2 border-t border-blue-100 dark:border-slate-600">
+                    <p className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Saldo Pendiente Actual:</p>
+                    <p className={`font-black text-sm ${saldoActual <= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                       {formatoPesos(saldoActual)}
                     </p>
                   </div>
-                </div>
+                )}
               </div>
-            )}
 
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase px-1 italic">N° Comprobante / Referencia</label>
-              <input 
-                className="w-full border-2 p-2.5 rounded-xl font-bold text-xs bg-white outline-none focus:border-blue-500 uppercase"
-                value={pagoForm.referencia || ''}
-                onChange={(e) => setPagoForm({...pagoForm, referencia: e.target.value})}
-                placeholder="Ej: N° Transacción 458921 / Cheque N° 102" 
-              />
-            </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">N° Comprobante / Referencia</label>
+                <input 
+                  type="text"
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white p-3 rounded-xl font-bold text-xs outline-none focus:border-blue-500 uppercase mt-1 placeholder-slate-400"
+                  value={pagoForm.referencia || ''}
+                  onChange={(e) => setPagoForm({...pagoForm, referencia: e.target.value})}
+                  placeholder="Ej: N° Transacción 458921 / Cheque N° 102" 
+                />
+              </div>
 
-            <button 
-              type="submit" 
-              className={`w-full p-3.5 rounded-xl font-black uppercase tracking-wider text-xs transition-colors shadow-md cursor-pointer ${
-                pagoForm.id_editando ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-700 hover:bg-green-800'
-              } text-white`}
-            >
-              {pagoForm.id_editando ? '💾 Actualizar Abono' : '💰 Registrar Abono'}
-            </button>
-          </form>
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <button type="button" onClick={() => setModalAbierto(false)} className="px-5 py-2.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-black text-xs uppercase tracking-wider rounded-xl transition-colors cursor-pointer">
+                  Cancelar
+                </button>
+                <button type="submit" className={`px-6 py-2.5 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition-colors cursor-pointer ${pagoForm.id_editando ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-700 hover:bg-blue-800'}`}>
+                  {pagoForm.id_editando ? '💾 Actualizar Abono' : '💰 Registrar Abono'}
+                </button>
+              </div>
+            </form>
 
-          <div className="pt-2 border-t border-slate-100">
-            <button
-              onClick={exportarPagosAExcel}
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow-md transition-all flex items-center justify-center gap-2 text-[10px] uppercase tracking-wider border border-emerald-500 cursor-pointer"
-            >
-              📊 EXPORTAR A EXCEL TOTAL REGISTRO DE PAGOS
-            </button>
           </div>
         </div>
+      )}
 
-        {/* COLUMNA DERECHA: GRILLA DISTRIBUIDA EN COLUMNAS */}
-        <div className="lg:col-span-2 space-y-6">
-          {remisionSeleccionada ? (
-            <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-200">
-              
-              <div className="bg-slate-800 p-4 text-white flex justify-between items-center flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-black uppercase text-xs tracking-widest italic">Ficha de Remisión: {remisionSeleccionada.numero_remision}</h3>
-                  
-                  {saldoActual <= 0 ? (
-                    <span className="bg-emerald-600 text-white px-2 py-0.5 rounded-md text-[9px] font-black uppercase">🟢 PAGADA</span>
-                  ) : totalAbonado > 0 ? (
-                    <span className="bg-amber-500 text-slate-900 px-2 py-0.5 rounded-md text-[9px] font-black uppercase">🟡 ABONADA</span>
-                  ) : (
-                    <span className="bg-rose-600 text-white px-2 py-0.5 rounded-md text-[9px] font-black uppercase">🔴 PENDIENTE DE PAGO</span>
-                  )}
-                </div>
-
-                <span className="bg-green-700 px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase">Detalle Carga</span>
-              </div>
-
-              <div className="p-5 space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-b pb-5">
-                  <div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase italic">Cliente Destinatario</p>
-                    <p className="font-black text-lg text-slate-900 uppercase leading-tight mt-1">{remisionSeleccionada.clientes?.nombre_completo}</p>
-                    <p className="text-[10px] font-bold text-slate-400 mt-1 italic">Fecha Carga: {remisionSeleccionada.fecha_venta}</p>
-                  </div>
-
-                  <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                    <p className="text-[10px] font-black text-blue-600 uppercase mb-2 tracking-wider italic">Contenido Despachado</p>
-                    <div className="space-y-1.5">
-                      {remisionSeleccionada.detalle_ventas?.map((item, i) => (
-                        <div key={i} className="flex justify-between items-center border-b border-dashed border-slate-200 pb-1">
-                          <p className="text-[11px] font-bold text-slate-700 uppercase">{item.descripcion}</p>
-                          <p className="text-[10px] font-black text-blue-700 bg-blue-100 px-2 py-0.5 rounded-md">
-                            {item.amount || item.cantidad} {item.escala}
-                          </p>
-                        </div>
-                      ))}
-                      <div className="pt-2 flex justify-between items-center">
-                        <p className="text-[9px] font-black text-slate-400 uppercase italic">Valor Total Venta:</p>
-                        <p className="text-sm font-black text-green-700">{formatoPesos(remisionSeleccionada.total_venta)}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* TABLA DISTRIBUIDA EN COLUMNAS */}
-                <div className="space-y-3">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Historial de Abonos Recibidos</p>
-                  
-                  {historialAbonos?.length > 0 ? (
-                    <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-sm">
-                      <table className="w-full text-left text-[11px] border-collapse">
-                        <thead>
-                          <tr className="bg-slate-100 text-slate-600 uppercase font-black border-b border-slate-200">
-                            <th className="p-2.5 text-center">N°</th>
-                            <th className="p-2.5">Fecha Abono</th>
-                            <th className="p-2.5 text-center">Forma / Medio de Pago</th>
-                            <th className="p-2.5">N° Ref / Comprobante</th>
-                            <th className="p-2.5 text-right">Monto Abono</th>
-                            <th className="p-2.5 text-center">Acciones</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 font-bold text-slate-700">
-                          {historialAbonos.map((abono, idx) => {
-                            const medioLimpio = obtenerMedioPagoLimpio(abono);
-
-                            return (
-                              <tr key={abono.id} className="hover:bg-sky-50/60 transition-colors">
-                                <td className="p-2.5 text-center">
-                                  <span className="bg-blue-100 text-blue-800 w-5 h-5 rounded-full inline-flex items-center justify-center font-black text-[9px]">
-                                    {idx + 1}
-                                  </span>
-                                </td>
-
-                                <td className="p-2.5 font-bold text-slate-800 whitespace-nowrap">
-                                  {abono.fecha_pago}
-                                </td>
-
-                                <td className="p-2.5 text-center">
-                                  <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-tight inline-block">
-                                    💳 {medioLimpio}
-                                  </span>
-                                </td>
-
-                                <td className="p-2.5 uppercase text-slate-500 font-bold text-[10px]">
-                                  {abono.referencia || abono.nota ? (
-                                    <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-black">
-                                      {abono.referencia || abono.nota}
-                                    </span>
-                                  ) : (
-                                    <span className="text-gray-300 italic">S/N</span>
-                                  )}
-                                </td>
-
-                                <td className="p-2.5 text-right font-black text-blue-700 text-xs whitespace-nowrap">
-                                  +{formatoPesos(abono.monto)}
-                                </td>
-
-                                <td className="p-2.5 text-center">
-                                  <div className="flex gap-1 justify-center">
-                                    <button 
-                                      type="button"
-                                      onClick={() => prepararEdicionPago(abono)}
-                                      className="p-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-600 hover:text-white transition-all text-xs"
-                                      title="Editar"
-                                    >
-                                      ✏️
-                                    </button>
-                                    <button 
-                                      type="button"
-                                      onClick={() => eliminarPago(abono.id)}
-                                      className="p-1 bg-red-100 text-red-700 rounded hover:bg-red-600 hover:text-white transition-all text-xs"
-                                      title="Eliminar"
-                                    >
-                                      🗑️
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="text-center py-5 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase italic">Sin pagos registrados a esta remisión</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="bg-slate-900 p-4 rounded-2xl flex justify-between items-center text-white shadow-md">
-                  <div>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase">Total Recaudado</p>
-                    <p className="font-black text-base text-blue-400">{formatoPesos(totalAbonado)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Saldo Neto Pendiente</p>
-                    <p className={`font-black text-xl ${saldoActual <= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      {formatoPesos(saldoActual)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex justify-end pt-1">
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await imprimirReciboCarteraPDF(remisionSeleccionada);
-                    }}
-                    className="px-4 py-2 bg-red-700 hover:bg-red-800 text-white font-black italic rounded-xl shadow-md transition-colors flex items-center gap-1.5 text-xs uppercase tracking-wider border border-red-600 cursor-pointer"
-                  >
-                    🖨️ Imprimir PDF Remisión
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-blue-50 border-2 border-dashed border-blue-200 p-12 rounded-3xl text-center flex items-center justify-center h-full min-h-[300px]">
-              <p className="text-blue-400 font-black uppercase text-xs italic">Seleccione un cliente y una remisión para cargar el desglose y su estado de cuenta</p>
-            </div>
-          )}
-        </div>
-
-      </div>
     </div>
   );
 }

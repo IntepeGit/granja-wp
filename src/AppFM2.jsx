@@ -36,34 +36,6 @@ function App() {
   const [balancesGrafica, setBalancesGrafica] = useState([])
   const [notificacion, setNotificacion] = useState({ visible: false, mensaje: '', tipo: 'exito' });
 
-  // 🌙 ESTADO Y LÓGICA PARA EL MODO OSCURO
-  const [isDarkMode, setIsDarkMode] = useState(false);
-
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    
-    if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
-      setIsDarkMode(true);
-      document.documentElement.classList.add('dark');
-    } else {
-      setIsDarkMode(false);
-      document.documentElement.classList.remove('dark');
-    }
-  }, []);
-
-  const toggleTheme = () => {
-    if (isDarkMode) {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
-      setIsDarkMode(false);
-    } else {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-      setIsDarkMode(true);
-    }
-  };
-
   useEffect(() => {
     const obtenerRolPerfil = async (userId) => {
       try {
@@ -166,42 +138,18 @@ function App() {
   const guardarGasto = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     
-    const nuevosErrores = {};
-
-    const fechaLimpia = (gastoForm.fecha || '').trim();
-    const comprobanteLimpio = (gastoForm.numero_comprobante || '').toUpperCase().trim();
-    const invernaderoLimpio = (gastoForm.invernadero_id || '').toString().trim();
-    const descripcionLimpia = (gastoForm.descripcion || '').toUpperCase().trim();
-    const cantidadNum = parseFloat(gastoForm.cantidad) || 0;
-    const precioNum = parseFloat(gastoForm.precio_unitario) || 0;
-    const montoTotal = cantidadNum * precioNum;
-
-    if (!fechaLimpia) nuevosErrores.fecha = "Seleccione una fecha válida.";
-    if (!comprobanteLimpio) nuevosErrores.comprobante = "Ingrese el N° de factura o comp.";
-    if (!invernaderoLimpio) nuevosErrores.invernadero = "Seleccione un invernadero.";
-    if (!descripcionLimpia) nuevosErrores.descripcion = "Ingrese el concepto o detalle.";
-    if (cantidadNum <= 0) nuevosErrores.cantidad = "Introduzca una cantidad mayor a 0.";
-    if (precioNum <= 0) nuevosErrores.precio = "Introduzca un precio válido.";
-
-    if (Object.keys(nuevosErrores).length > 0) {
-      setErrores(nuevosErrores);
-      return;
-    }
-
-    setErrores({}); 
-
     const payload = {
-      descripcion: descripcionLimpia,
+      descripcion: (gastoForm.descripcion || '').toUpperCase().trim(),
       categoria: gastoForm.categoria,
-      monto: montoTotal,
-      invernadero_id: invernaderoLimpio,
+      monto: parseFloat(gastoForm.monto) || 0,
+      invernadero_id: gastoForm.invernadero_id || null,
       proveedor_id: gastoForm.proveedor_id || null,
-      numero_comprobante: comprobanteLimpio,
+      numero_comprobante: (gastoForm.numero_comprobante || '').toUpperCase().trim(),
       nota: gastoForm.nota ? gastoForm.nota.trim() : null,
-      fecha: fechaLimpia,
-      cantidad: cantidadNum,
+      fecha: gastoForm.fecha,
+      cantidad: parseFloat(gastoForm.cantidad) || 0,
       unidad_medida: gastoForm.unidad_medida || 'Unidad',
-      precio_unitario: precioNum,
+      precio_unitario: parseFloat(gastoForm.precio_unitario) || 0,
       forma_pago: gastoForm.forma_pago || 'Efectivo',
       numero_cuenta: gastoForm.numero_cuenta || null
     };
@@ -210,11 +158,11 @@ function App() {
       if (gastoForm.id_editando) {
         const { error } = await supabase.from('egresos').update(payload).eq('id', gastoForm.id_editando);
         if (error) throw error;
-        mostrarAlerta("Gasto actualizado correctamente", "exito");
+        mostrarAlerta("Gasto actualizado correctamente en la tabla egresos", "exito");
       } else {
         const { error } = await supabase.from('egresos').insert([payload]);
         if (error) throw error;
-        mostrarAlerta("Gasto registrado correctamente", "exito");
+        mostrarAlerta("Gasto registrado correctamente en la tabla egresos", "exito");
       }
 
       setGastoForm({ 
@@ -233,7 +181,6 @@ function App() {
         forma_pago: 'Efectivo',
         numero_cuenta: ''
       });
-      setErrores({});
       cargarTodo();
     } catch (error) {
       console.error("Error al guardar gasto:", error);
@@ -660,7 +607,7 @@ function App() {
 
   const NavItem = ({ id, label, icon }) => (
     <button onClick={() => { setTab(id); setIsMenuOpen(false); setShowConfigSubmenu(false); }} 
-      className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${tab === id ? 'bg-green-700 dark:bg-emerald-600 text-white shadow-md' : 'text-green-100 hover:bg-green-800 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
+      className={`flex items-center gap-3 w-full p-4 rounded-xl transition ${tab === id ? 'bg-[#7c5c8c] text-white shadow-md' : 'text-green-100 hover:bg-[#2e3e2b]'}`}>
       <span className="text-xl">{icon}</span> <span className="font-bold text-sm capitalize">{label}</span>
     </button>
   )
@@ -669,27 +616,19 @@ function App() {
 
   return (
     <ProtectedRoute session={session}>
-      {/* 🌙 SE AÑADE SOPORTE DARK MODE AL CONTENEDOR PRINCIPAL */}
-      <div className="flex min-h-screen bg-slate-50 dark:bg-slate-900 font-sans overflow-hidden transition-colors duration-300 relative">
-        
-        {/* 📱 CAPA DE OSCURECIMIENTO (BACKDROP) PARA MÓVIL CUANDO EL MENÚ ESTÁ ABIERTO */}
-        {isMenuOpen && (
-          <div 
-            onClick={() => setIsMenuOpen(false)}
-            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs lg:hidden transition-opacity duration-300"
-          />
-        )}
-
-        <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-green-900 dark:bg-slate-900 border-r border-transparent dark:border-slate-800 shadow-2xl transform ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static transition-transform duration-300 flex flex-col`}>
+      <div className="flex min-h-screen bg-slate-50 font-sans overflow-hidden">
+        <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-[#3B4E38] shadow-2xl transform ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static transition-transform duration-300 flex flex-col`}>
   
-            <div className="p-6 text-center border-b border-green-800 dark:border-slate-800 flex flex-col items-center justify-center gap-2">
-              <h2 className="text-white font-black text-2xl tracking-tighter">🚜 GRANJA WP</h2>
+            <div className="p-6 text-center border-b border-[#2e3e2b] flex flex-col items-center justify-center gap-2">
+              <h2 className="text-white font-black text-xl tracking-tighter flex items-center gap-2">
+                <span>🫐</span> INVERNADERO FM
+              </h2>
               
               {userRole ? (
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-inner ${
                   userRole === 'admin' 
                     ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' 
-                    : 'bg-green-700/50 text-green-200 border-green-600/40'
+                    : 'bg-[#7c5c8c]/30 text-purple-200 border-[#7c5c8c]/40'
                 }`}>
                   {userRole === 'admin' ? '👑 Administrador' : '👨‍🌾 Operario'}
                 </span>
@@ -713,7 +652,7 @@ function App() {
             {userRole === 'admin' && (
               <div className="space-y-1">
                 <button onClick={() => setShowConfigSubmenu(!showConfigSubmenu)} 
-                  className={`flex items-center justify-between w-full p-4 rounded-xl transition ${tab.startsWith('config-') ? 'bg-green-800 dark:bg-emerald-700 text-white' : 'text-green-100 dark:text-slate-300 hover:bg-green-800 dark:hover:bg-slate-800'}`}>
+                  className={`flex items-center justify-between w-full p-4 rounded-xl transition ${tab.startsWith('config-') ? 'bg-[#7c5c8c] text-white' : 'text-green-100 hover:bg-[#2e3e2b]'}`}>
                   <div className="flex items-center gap-3">
                     <span className="text-xl">⚙️</span>
                     <span className="font-bold text-sm">Configuración</span>
@@ -722,51 +661,33 @@ function App() {
                 </button>
                 {showConfigSubmenu && (
                   <div className="pl-6 space-y-1 animate-in slide-in-from-top-2 duration-200">
-                    <button onClick={() => { setTab('config-inv'); setIsMenuOpen(false); }} className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition ${tab === 'config-inv' ? 'text-white bg-green-700 dark:bg-emerald-600' : 'text-green-300 dark:text-slate-400 hover:bg-green-800 dark:hover:bg-slate-700'}`}>🏠 Invernaderos</button>
-                    <button onClick={() => { setTab('config-cli'); setIsMenuOpen(false); }} className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition ${tab === 'config-cli' ? 'text-white bg-green-700 dark:bg-emerald-600' : 'text-green-300 dark:text-slate-400 hover:bg-green-800 dark:hover:bg-slate-700'}`}>👥 Clientes</button>
-                    <button onClick={() => { setTab('config-prov'); setIsMenuOpen(false); }} className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition ${tab === 'config-prov' ? 'text-white bg-green-700 dark:bg-emerald-600' : 'text-green-300 dark:text-slate-400 hover:bg-green-800 dark:hover:bg-slate-700'}`}>🚚 Proveedores</button>
-                    <button onClick={() => { setTab('config-cosecha'); setIsMenuOpen(false); }} className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition ${tab === 'config-cosecha' ? 'text-white bg-green-700 dark:bg-emerald-600' : 'text-green-300 dark:text-slate-400 hover:bg-green-800 dark:hover:bg-slate-700'}`}>🌿 Parámetros Cosecha</button>
+                    <button onClick={() => { setTab('config-inv'); setIsMenuOpen(false); }} className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition ${tab === 'config-inv' ? 'text-white bg-[#7c5c8c]' : 'text-green-100 hover:bg-[#2e3e2b]'}`}>🏠 Invernaderos</button>
+                    <button onClick={() => { setTab('config-cli'); setIsMenuOpen(false); }} className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition ${tab === 'config-cli' ? 'text-white bg-[#7c5c8c]' : 'text-green-100 hover:bg-[#2e3e2b]'}`}>👥 Clientes</button>
+                    <button onClick={() => { setTab('config-prov'); setIsMenuOpen(false); }} className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition ${tab === 'config-prov' ? 'text-white bg-[#7c5c8c]' : 'text-green-100 hover:bg-[#2e3e2b]'}`}>🚚 Proveedores</button>
+                    <button onClick={() => { setTab('config-cosecha'); setIsMenuOpen(false); }} className={`flex items-center gap-3 w-full p-3 rounded-lg text-xs font-bold transition ${tab === 'config-cosecha' ? 'text-white bg-[#7c5c8c]' : 'text-green-100 hover:bg-[#2e3e2b]'}`}>🌿 Parámetros Cosecha</button>
                   </div>
                 )}
               </div>
             )}
             
-            <button onClick={() => supabase.auth.signOut()} className="flex items-center gap-3 w-full p-4 rounded-xl text-red-200 dark:text-red-400 hover:bg-red-900/50 dark:hover:bg-red-900/30 mt-10 transition-colors">
+            <button onClick={() => supabase.auth.signOut()} className="flex items-center gap-3 w-full p-4 rounded-xl text-red-200 hover:bg-red-950/20 mt-6">
               <span>🚪</span> <span className="text-sm font-bold">Cerrar Sesión</span>
             </button>
-
-            <div className="pt-6 pb-2 text-center border-t border-green-800/40 dark:border-slate-800 mt-4 space-y-4">
-              <div className="w-full bg-green-700/80 dark:bg-slate-800 border border-green-500/40 dark:border-slate-700 py-2.5 px-4 rounded-full shadow-inner flex items-center justify-center cursor-default">
-                <span className="text-[10px] font-black text-white dark:text-slate-300 uppercase tracking-widest drop-shadow-sm">
-                  Plataforma Agrícola
-                </span>
-              </div>
-              <p className="text-[10px] text-green-300/60 dark:text-slate-500 font-bold normal-case tracking-wider">
-                © {new Date().getFullYear()} INTEPE All Rights Reserved
+            
+            {/* 📋 PIE DE PÁGINA AÑADIDO AL FINAL DEL MENÚ */}
+            <div className="pt-6 pb-2 text-center border-t border-green-800/40 mt-4">
+              <p className="text-[10px] text-green-300/60 font-bold uppercase tracking-wider">
+                © {new Date().getFullYear()} INTEPE
               </p>
             </div>
           </nav>
         </aside>
-         
 
         <div className="flex-1 flex flex-col h-screen overflow-hidden">
-          {/* 🌙 CABECERA PRINCIPAL CON BOTÓN DE TEMA */}
-          <header className="bg-white dark:bg-slate-800 p-4 shadow-sm border-b border-transparent dark:border-slate-700 flex justify-between items-center lg:px-10 transition-colors duration-300">
-            <div className="flex items-center gap-3">
-              <button className="lg:hidden text-2xl p-2 text-green-900 dark:text-emerald-400 cursor-pointer" onClick={() => setIsMenuOpen(true)}>☰</button>
-              <h1 className="text-xl font-black text-green-900 dark:text-emerald-400 tracking-tight uppercase">
-                {tab.replace('config-', 'Configuración: ').replace('reporte', 'Reporte de Ventas').replace('inventario', 'Inventario de Bodega').replace('cosecha', 'Cosecha Diaria').replace('nomina', 'Control de Nómina')}
-              </h1>
-            </div>
-            
-            {/* 🌞/🌙 BOTÓN TOGGLE MODO OSCURO */}
-            <button
-              onClick={toggleTheme}
-              className="p-2.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-amber-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center justify-center shadow-sm cursor-pointer"
-              title={isDarkMode ? "Cambiar a Modo Claro" : "Cambiar a Modo Oscuro"}
-            >
-              {isDarkMode ? '☀️' : '🌙'}
-            </button>
+          <header className="bg-white p-4 shadow-sm flex justify-between items-center lg:px-10">
+            <button className="lg:hidden text-2xl p-2 text-green-900" onClick={() => setIsMenuOpen(true)}>☰</button>
+            <h1 className="text-xl font-black text-green-900 tracking-tight uppercase">{tab.replace('config-', 'Configuración: ').replace('reporte', 'Reporte de Ventas').replace('inventario', 'Inventario de Bodega').replace('cosecha', 'Cosecha Diaria').replace('nomina', 'Control de Nómina')}</h1>
+            <div className="w-10"></div>
           </header>
 
           <main className="flex-1 overflow-y-auto p-4 md:p-10 space-y-10">
@@ -882,9 +803,9 @@ function App() {
         </div>
 
         {notificacion.visible && (
-          <div className="fixed bottom-10 right-10 z-[100] bg-white dark:bg-slate-800 border border-green-100 dark:border-slate-700 p-6 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-5">
+          <div className="fixed bottom-10 right-10 z-[100] bg-white border border-green-100 p-6 rounded-2xl shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-5">
             <span className="text-2xl">{notificacion.tipo === 'exito' ? '✅' : '❌'}</span>
-            <p className="text-sm font-bold text-green-800 dark:text-emerald-400">{notificacion.mensaje}</p>
+            <p className="text-sm font-bold text-green-800">{notificacion.mensaje}</p>
           </div>
         )}
       </div>
