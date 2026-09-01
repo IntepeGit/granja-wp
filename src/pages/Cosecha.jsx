@@ -361,7 +361,7 @@ export default function Cosecha({ mostrarAlerta, listaInvernaderos, userRole }) 
         </div>
       </div>
 
-      {/* 📊 TABLA DE HISTORIAL (ANCHO COMPLETO) */}
+      {/* 📊 TABLA DE HISTORIAL COMPRIMIDA */}
       <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-700 transition-colors duration-300">
         <div className="p-4 bg-slate-800 dark:bg-slate-900 text-white font-black text-xs uppercase tracking-wider flex justify-between items-center">
           <span>Historial de Recolección</span>
@@ -372,18 +372,18 @@ export default function Cosecha({ mostrarAlerta, listaInvernaderos, userRole }) 
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-slate-100 dark:bg-slate-700/80 text-slate-700 dark:text-slate-300 uppercase font-black text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
-                <th className="p-4">Fecha</th>
-                <th className="p-4">Invernadero</th>
-                <th className="p-4">Producto / Calidad</th>
-                <th className="p-4">Recolector</th>
-                <th className="p-4 text-right">Cant. Recogida</th>
-                {userRole === 'admin' && <th className="p-4 text-center">Acción</th>}
+                <th className="py-2.5 px-3">Fecha</th>
+                <th className="py-2.5 px-3">Invernadero</th>
+                <th className="py-2.5 px-3">Producto / Calidad</th>
+                <th className="py-2.5 px-3">Recolector</th>
+                <th className="py-2.5 px-3 text-right">Cant. Recogida</th>
+                {userRole === 'admin' && <th className="py-2.5 px-3 text-center">Acción</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60 font-bold text-slate-700 dark:text-slate-300">
               {registrosFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan={userRole === 'admin' ? 6 : 5} className="p-8 text-center text-slate-400 dark:text-slate-500 italic font-bold">
+                  <td colSpan={userRole === 'admin' ? 6 : 5} className="p-6 text-center text-slate-400 dark:text-slate-500 italic font-bold">
                     No hay registros de cosecha cargados para este filtro.
                   </td>
                 </tr>
@@ -391,35 +391,35 @@ export default function Cosecha({ mostrarAlerta, listaInvernaderos, userRole }) 
                 registrosFiltrados.map((item, idx) => (
                   <tr key={item.id} className={`${idx % 2 === 0 ? 'bg-white dark:bg-slate-800' : 'bg-slate-50/50 dark:bg-slate-800/60'} hover:bg-sky-50/50 dark:hover:bg-slate-700/50 transition-colors border-l-8 border-green-700 dark:border-emerald-600`}>
                     
-                    <td className="p-4 whitespace-nowrap text-slate-900 dark:text-white font-black">
+                    <td className="py-2 px-3 whitespace-nowrap text-slate-900 dark:text-white font-black">
                       {item.fecha_cosecha}
                     </td>
                     
-                    <td className="p-4 font-black text-slate-700 dark:text-slate-300 uppercase">
-                      <span className="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-2 py-1 rounded-md text-[9px] shadow-sm">
+                    <td className="py-2 px-3 font-black text-slate-700 dark:text-slate-300 uppercase whitespace-nowrap">
+                      <span className="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-2 py-0.5 rounded-md text-[9px] shadow-sm">
                         {item.invernaderos?.nombre || 'GENERAL'}
                       </span>
                     </td>
                     
-                    <td className="p-4 uppercase">
-                      <span className="font-black text-slate-900 dark:text-white block">{item.producto}</span>
-                      <span className="text-[10px] font-bold text-[#117097] dark:text-sky-400 mt-0.5 inline-block">📌 {item.calidad}</span>
+                    <td className="py-2 px-3 uppercase max-w-[250px] whitespace-normal break-words">
+                      <span className="font-black text-slate-900 dark:text-white block leading-snug">{item.producto}</span>
+                      <span className="text-[9px] font-bold text-[#117097] dark:text-sky-400 mt-0.5 inline-block">📌 {item.calidad}</span>
                     </td>
                     
-                    <td className="p-4 uppercase text-emerald-800 dark:text-emerald-400 font-black">
-                      <span className="flex items-center gap-1.5"><span>👤</span> {item.operario_recolector || 'N/R'}</span>
+                    <td className="py-2 px-3 uppercase text-emerald-800 dark:text-emerald-400 font-black whitespace-nowrap">
+                      <span className="flex items-center gap-1"><span>👤</span> {item.operario_recolector || 'N/R'}</span>
                     </td>
                     
-                    <td className="p-4 text-right whitespace-nowrap">
-                      <span className="font-black text-base text-green-800 dark:text-emerald-400">{item.cantidad}</span> 
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-black ml-1 uppercase">{item.unidad_medida}</span>
+                    <td className="py-2 px-3 text-right whitespace-nowrap">
+                      <span className="font-black text-xs text-green-800 dark:text-emerald-400">{item.cantidad}</span> 
+                      <span className="text-[9px] text-slate-500 dark:text-slate-400 font-black ml-1 uppercase">{item.unidad_medida}</span>
                     </td>
                     
                     {userRole === 'admin' && (
-                      <td className="p-4 text-center">
+                      <td className="py-2 px-3 text-center whitespace-nowrap">
                         <button 
                           onClick={() => eliminarRegistroCosecha(item.id)} 
-                          className="p-1.5 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-700 hover:text-white transition-colors border border-red-200 dark:border-red-900 cursor-pointer" 
+                          className="p-1 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-700 hover:text-white transition-colors border border-red-200 dark:border-red-900 cursor-pointer" 
                           title="Eliminar registro"
                         >
                           🗑️

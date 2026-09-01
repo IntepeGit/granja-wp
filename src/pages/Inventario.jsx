@@ -238,7 +238,6 @@ export default function Inventario({ mostrarAlerta, datosInvernaderos, userRole 
     }
   };
 
-  // ⚡ CÁLCULO DE NIVELES DE STOCK (CRÍTICO ≤ 1 Y ALERTA 2-3)
   const obtenerEstadoStock = (ins) => {
     if (ins.tipo_item !== 'Consumible' || ins.aplica_stock === false) {
       return { nivel: 'herramienta', etiqueta: ins.estado_herramienta || 'Activo', claseTabla: 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-600', claseTexto: 'text-[#117097] dark:text-sky-400' };
@@ -262,7 +261,6 @@ export default function Inventario({ mostrarAlerta, datosInvernaderos, userRole 
       const itemsConsumibles = listaInventario.filter(i => i.tipo_item === 'Consumible');
       const itemsHerramientas = listaInventario.filter(i => i.tipo_item !== 'Consumible');
 
-      // 1. HOJA DE CONSUMIBLES
       const sheetConsumibles = workbook.addWorksheet('Consumibles');
       sheetConsumibles.columns = [
         { header: 'ARTÍCULO / INSUMO', key: 'nombre', width: 30 },
@@ -323,7 +321,6 @@ export default function Inventario({ mostrarAlerta, datosInvernaderos, userRole 
         if (colN === 3 || colN === 4) cell.alignment = { vertical: 'middle', horizontal: 'right' };
       });
 
-      // 2. HOJA DE HERRAMIENTAS Y ACTIVOS FIJOS
       const sheetHerramientas = workbook.addWorksheet('Herramientas y Activos');
       sheetHerramientas.columns = [
         { header: 'HERRAMIENTA / EQUIPO', key: 'nombre', width: 30 },
@@ -391,7 +388,6 @@ export default function Inventario({ mostrarAlerta, datosInvernaderos, userRole 
     }
   };
 
-  // 🚨 FILTRADO DE INSUMOS
   const insumosCriticos = listaInventario.filter(i => i.tipo_item === 'Consumible' && i.aplica_stock !== false && parseFloat(i.cantidad_actual) <= 3);
 
   const insumosFiltrados = listaInventario.filter(i => {
@@ -416,7 +412,6 @@ export default function Inventario({ mostrarAlerta, datosInvernaderos, userRole 
           <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Control de consumibles, herramientas y existencias físicas.</p>
         </div>
         
-        {/* BOTONERA DE ACCIONES RÁPIDAS (ABREN MODALES) */}
         <div className="flex items-center gap-2 flex-wrap justify-center xl:justify-end w-full xl:w-auto">
           <button onClick={exportarInventarioAExcel} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer">
             <span>📊</span> Excel
@@ -484,24 +479,24 @@ export default function Inventario({ mostrarAlerta, datosInvernaderos, userRole 
         </div>
       </div>
 
-      {/* 📊 TABLA DE INVENTARIO (ANCHO COMPLETO) */}
+      {/* 📊 TABLA DE INVENTARIO COMPRIMIDA */}
       <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl overflow-hidden border border-gray-200 dark:border-slate-700 transition-colors duration-300">
         <div className="overflow-x-auto min-h-[400px]">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-slate-100 dark:bg-slate-700/80 text-[10px] font-black uppercase text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
-                <th className="p-4">Artículo / Nombre</th>
-                <th className="p-4 text-center">Tipo</th>
-                <th className="p-4 text-center">📍 Localización Actual</th>
-                <th className="p-4 text-right">Cant. Actual</th>
-                <th className="p-4 text-center">Unidad</th>
-                <th className="p-4 text-center">Estado / Alerta</th>
-                {esAdmin && <th className="p-4 text-center">Acciones</th>}
+                <th className="py-2.5 px-3">Artículo / Nombre</th>
+                <th className="py-2.5 px-3 text-center">Tipo</th>
+                <th className="py-2.5 px-3 text-center">📍 Localización Actual</th>
+                <th className="py-2.5 px-3 text-right">Cant. Actual</th>
+                <th className="py-2.5 px-3 text-center">Unidad</th>
+                <th className="py-2.5 px-3 text-center">Estado / Alerta</th>
+                {esAdmin && <th className="py-2.5 px-3 text-center">Acciones</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60 font-bold text-slate-700 dark:text-slate-300">
               {insumosFiltrados.length === 0 ? (
-                <tr><td colSpan={esAdmin ? 7 : 6} className="p-8 text-center text-gray-400 dark:text-slate-500 italic font-bold">No hay artículos coincidentes en el inventario.</td></tr>
+                <tr><td colSpan={esAdmin ? 7 : 6} className="p-6 text-center text-gray-400 dark:text-slate-500 italic font-bold">No hay artículos coincidentes en el inventario.</td></tr>
               ) : (
                 insumosFiltrados.map((ins, idx) => {
                   const estado = obtenerEstadoStock(ins);
@@ -510,7 +505,7 @@ export default function Inventario({ mostrarAlerta, datosInvernaderos, userRole 
                   return (
                     <tr key={ins.id} className={`${idx % 2 === 0 ? 'bg-white dark:bg-slate-800' : 'bg-slate-50/50 dark:bg-slate-800/60'} hover:bg-sky-50/50 dark:hover:bg-slate-700/50 transition-colors border-l-8 ${ins.tipo_item === 'Consumible' ? 'border-emerald-500' : 'border-purple-500'}`}>
                       
-                      <td className="p-4 font-black text-slate-900 dark:text-white uppercase">
+                      <td className="py-2 px-3 font-black text-slate-900 dark:text-white uppercase max-w-[300px] whitespace-normal break-words">
                         {editandoEste ? (
                           <div className="space-y-1">
                             <input type="text" className="border border-slate-300 dark:border-slate-600 p-1.5 rounded-lg w-full bg-white dark:bg-slate-900 text-xs font-black uppercase outline-none focus:border-[#117097] text-slate-800 dark:text-white" value={filaEditable.nombre_insumo} onChange={e => setFilaEditable({...filaEditable, nombre_insumo: e.target.value})} placeholder="Nombre..." />
@@ -526,22 +521,22 @@ export default function Inventario({ mostrarAlerta, datosInvernaderos, userRole 
                         )}
                       </td>
 
-                      <td className="p-4 text-center">
+                      <td className="py-2 px-3 text-center whitespace-nowrap">
                         {editandoEste ? (
-                          <select className="border border-slate-300 dark:border-slate-600 p-1.5 rounded-lg bg-sky-50 dark:bg-slate-900 text-[#117097] dark:text-sky-400 text-[10px] font-black outline-none" value={filaEditable.tipo_item} onChange={e => setFilaEditable({ ...filaEditable, tipo_item: e.target.value })}>
+                          <select className="border border-slate-300 dark:border-slate-600 p-1 rounded-lg bg-sky-50 dark:bg-slate-900 text-[#117097] dark:text-sky-400 text-[10px] font-black outline-none" value={filaEditable.tipo_item} onChange={e => setFilaEditable({ ...filaEditable, tipo_item: e.target.value })}>
                             <option value="Consumible">🧪 Consumible</option>
                             <option value="Herramienta">🛠️ Herramienta</option>
                           </select>
                         ) : (
-                          <span className={`px-2 py-1 rounded-md text-[9px] font-black uppercase shadow-sm border ${ins.tipo_item === 'Consumible' ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' : 'bg-purple-50 dark:bg-purple-950/80 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800'}`}>
+                          <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase shadow-sm border ${ins.tipo_item === 'Consumible' ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' : 'bg-purple-50 dark:bg-purple-950/80 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800'}`}>
                             {ins.tipo_item === 'Consumible' ? '🧪 Consumible' : '🛠️ Activo'}
                           </span>
                         )}
                       </td>
 
-                      <td className="p-4 text-center">
+                      <td className="py-2 px-3 text-center whitespace-nowrap">
                         {editandoEste ? (
-                          <select className="border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-slate-900 p-1.5 rounded-lg text-[10px] font-black text-amber-900 dark:text-amber-200 outline-none max-w-[150px]" value={filaEditable.ubicacion} onChange={e => setFilaEditable({ ...filaEditable, ubicacion: e.target.value })}>
+                          <select className="border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-slate-900 p-1 rounded-lg text-[10px] font-black text-amber-900 dark:text-amber-200 outline-none max-w-[150px]" value={filaEditable.ubicacion} onChange={e => setFilaEditable({ ...filaEditable, ubicacion: e.target.value })}>
                             <optgroup label="🏢 Bodegas & Áreas">
                               {listaUbicaciones.map(u => <option key={u.id} value={u.nombre}>{u.nombre}</option>)}
                             </optgroup>
@@ -550,23 +545,23 @@ export default function Inventario({ mostrarAlerta, datosInvernaderos, userRole 
                             </optgroup>
                           </select>
                         ) : (
-                          <span className="inline-block bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 px-2.5 py-1 rounded-md text-[9px] font-black uppercase shadow-sm">
+                          <span className="inline-block bg-amber-50 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 px-2 py-0.5 rounded-md text-[9px] font-black uppercase shadow-sm">
                             📍 {ins.ubicacion || 'BODEGA PRINCIPAL'}
                           </span>
                         )}
                       </td>
 
-                      <td className={`p-4 text-right font-black text-sm ${estado.claseTexto}`}>
+                      <td className={`py-2 px-3 text-right font-black text-xs ${estado.claseTexto} whitespace-nowrap`}>
                         {editandoEste ? (
-                          <input type="number" step="any" className="border border-slate-300 dark:border-slate-600 p-1.5 rounded-lg w-20 text-right font-black bg-white dark:bg-slate-900 text-slate-800 dark:text-white" value={filaEditable.cantidad_actual} onChange={e => setFilaEditable({...filaEditable, cantidad_actual: e.target.value})} />
+                          <input type="number" step="any" className="border border-slate-300 dark:border-slate-600 p-1 rounded-lg w-20 text-right font-black bg-white dark:bg-slate-900 text-slate-800 dark:text-white" value={filaEditable.cantidad_actual} onChange={e => setFilaEditable({...filaEditable, cantidad_actual: e.target.value})} />
                         ) : (
                           ins.cantidad_actual
                         )}
                       </td>
 
-                      <td className="p-4 text-center text-gray-500 dark:text-slate-400 text-[10px] uppercase tracking-wider">
+                      <td className="py-2 px-3 text-center text-gray-500 dark:text-slate-400 text-[10px] uppercase tracking-wider whitespace-nowrap">
                         {editandoEste ? (
-                          <select className="border border-slate-300 dark:border-slate-600 p-1.5 rounded-lg bg-white dark:bg-slate-900 text-[10px] font-bold text-slate-800 dark:text-white" value={filaEditable.unidad_medida} onChange={e => setFilaEditable({...filaEditable, unidad_medida: e.target.value})}>
+                          <select className="border border-slate-300 dark:border-slate-600 p-1 rounded-lg bg-white dark:bg-slate-900 text-[10px] font-bold text-slate-800 dark:text-white" value={filaEditable.unidad_medida} onChange={e => setFilaEditable({...filaEditable, unidad_medida: e.target.value})}>
                             {unidades.map(un => <option key={un} value={un}>{un}</option>)}
                           </select>
                         ) : (
@@ -574,23 +569,23 @@ export default function Inventario({ mostrarAlerta, datosInvernaderos, userRole 
                         )}
                       </td>
 
-                      <td className="p-4 text-center">
-                        <span className={`px-2.5 py-1 rounded-md text-[9px] font-black uppercase ${estado.claseTabla}`}>
+                      <td className="py-2 px-3 text-center whitespace-nowrap">
+                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase ${estado.claseTabla}`}>
                           {estado.etiqueta}
                         </span>
                       </td>
 
                       {esAdmin && (
-                        <td className="p-4 text-center">
+                        <td className="py-2 px-3 text-center whitespace-nowrap">
                           {editandoEste ? (
-                            <div className="flex gap-1.5 justify-center">
-                              <button onClick={() => guardarEdicionFila(ins.id)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1.5 rounded-lg text-[10px] font-black cursor-pointer shadow-sm transition-colors" title="Guardar Cambios">💾</button>
-                              <button onClick={() => setIdEditando(null)} className="bg-slate-400 hover:bg-slate-500 text-white px-2 py-1.5 rounded-lg text-[10px] font-black cursor-pointer shadow-sm transition-colors" title="Cancelar">❌</button>
+                            <div className="flex gap-1 justify-center">
+                              <button onClick={() => guardarEdicionFila(ins.id)} className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded-lg text-[9px] font-black cursor-pointer shadow-sm transition-colors" title="Guardar Cambios">💾</button>
+                              <button onClick={() => setIdEditando(null)} className="bg-slate-400 hover:bg-slate-500 text-white px-2 py-1 rounded-lg text-[9px] font-black cursor-pointer shadow-sm transition-colors" title="Cancelar">❌</button>
                             </div>
                           ) : (
-                            <div className="flex gap-1.5 justify-center">
-                              <button onClick={() => iniciarEdicion(ins)} className="p-1.5 bg-slate-700 dark:bg-slate-600 hover:bg-slate-900 dark:hover:bg-slate-500 text-white rounded-lg shadow-sm border border-slate-800 dark:border-slate-500 transition-colors text-[10px] cursor-pointer" title="Editar Registro">✏️</button>
-                              <button onClick={() => eliminarInsumoCompleto(ins.id, ins.nombre_insumo)} className="p-1.5 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-700 hover:text-white transition-colors border border-red-200 dark:border-red-900 cursor-pointer" title="Eliminar definitivamente">🗑️</button>
+                            <div className="flex gap-1 justify-center">
+                              <button onClick={() => iniciarEdicion(ins)} className="p-1 bg-slate-700 dark:bg-slate-600 hover:bg-slate-900 dark:hover:bg-slate-500 text-white rounded-lg shadow-sm border border-slate-800 dark:border-slate-500 transition-colors text-[9px] cursor-pointer" title="Editar Registro">✏️</button>
+                              <button onClick={() => eliminarInsumoCompleto(ins.id, ins.nombre_insumo)} className="p-1 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-700 hover:text-white transition-colors border border-red-200 dark:border-red-900 cursor-pointer" title="Eliminar definitivamente">🗑️</button>
                             </div>
                           )}
                         </td>
@@ -604,7 +599,7 @@ export default function Inventario({ mostrarAlerta, datosInvernaderos, userRole 
         </div>
       </div>
 
-      {/* 🧊 MODALES FLOTANTES */}
+      {/* 🧊 MODALES FLOTANTES (Mantenidos sin cambios de funcionalidad) */}
       
       {/* 1. MODAL: NUEVO ARTÍCULO */}
       {modalActivo === 'nuevo' && esAdmin && (
@@ -697,7 +692,6 @@ export default function Inventario({ mostrarAlerta, datosInvernaderos, userRole 
                 </div>
               </form>
 
-              {/* Mini formulario para añadir ubicaciones rápidas */}
               <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-xl border border-slate-200 dark:border-slate-700 mt-4">
                 <p className="text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-2">📍 ¿Falta una ubicación? Añádela aquí:</p>
                 <div className="flex gap-2">

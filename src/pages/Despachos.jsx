@@ -162,7 +162,6 @@ export default function Despachos({
         { header: 'TOTAL x Remision', key: 'totalRemisionCol', width: 22 }
       ];
 
-      // CLAVE ÚNICA: Remisión + Fecha
       const totalesPorRemisionFecha = {};
       datosDespachos.forEach(d => {
         const numRem = d.numero_remision || 'S/N';
@@ -467,24 +466,26 @@ export default function Despachos({
         </div>
       </div>
 
-      {/* 📊 TABLA DE DESPACHOS (ANCHO COMPLETO) */}
+      {/* 📊 TABLA DE DESPACHOS COMPRIMIDA EN DOBLE COLUMNA */}
       <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl overflow-hidden border border-gray-200 dark:border-slate-700 transition-colors duration-300">
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead>
+           <thead>
               <tr className="bg-slate-100 dark:bg-slate-700/80 text-slate-700 dark:text-slate-300 uppercase font-black text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-700 sticky top-0 z-10">
-                <th className="p-4">Fecha</th>
-                <th className="p-4 text-center">N° Remisión</th>
-                <th className="p-4">Cliente / Destino</th>
-                <th className="p-4">Productos (Cant + Escala)</th>
-                <th className="p-4 text-right">Total Carga</th>
-                <th className="p-4 text-center">Acciones</th>
+                <th className="py-2.5 px-3">Fecha</th>
+                <th className="py-2.5 px-3 text-center">N° Remisión</th>
+                <th className="py-2.5 px-3">Cliente / Destino</th>
+                <th className="py-2.5 px-3 text-center">
+                  PRODUCTOS (CANT + ESCALA)
+                </th>
+                <th className="py-2.5 px-3 text-right">Total Carga</th>
+                <th className="py-2.5 px-3 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60 font-bold text-slate-700 dark:text-slate-300">
               {despachosFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="p-8 text-center text-slate-400 dark:text-slate-500 italic font-bold">No hay registros de despachos coincidentes.</td>
+                  <td colSpan="6" className="p-6 text-center text-slate-400 dark:text-slate-500 italic font-bold">No hay registros de despachos coincidentes.</td>
                 </tr>
               ) : (
                 despachosFiltrados.map((d, index) => (
@@ -492,25 +493,26 @@ export default function Despachos({
                     key={d.id} 
                     className={`${index % 2 === 0 ? 'bg-white dark:bg-slate-800' : 'bg-slate-50/50 dark:bg-slate-800/60'} hover:bg-sky-50/50 dark:hover:bg-slate-700/50 transition-colors border-l-8 border-green-700 dark:border-emerald-600`}
                   >
-                    <td className="p-4 font-black text-slate-900 dark:text-white whitespace-nowrap">{d.fecha_venta}</td>
+                    <td className="py-2 px-3 font-black text-slate-900 dark:text-white whitespace-nowrap">{d.fecha_venta}</td>
                     
-                    <td className="p-4 text-center">
-                      <span className="bg-slate-800 dark:bg-slate-900 text-white px-2.5 py-1 rounded-md text-[11px] font-black shadow-sm">
+                    <td className="py-2 px-3 text-center whitespace-nowrap">
+                      <span className="bg-slate-800 dark:bg-slate-900 text-white px-2 py-0.5 rounded-md text-[10px] font-black shadow-sm">
                         {d.numero_remision}
                       </span>
                     </td>
                     
-                    <td className="p-4 uppercase font-bold text-slate-800 dark:text-slate-200">
-                      <p className="font-black text-slate-900 dark:text-white text-sm">{d.clientes?.nombre_completo || 'N/A'}</p>
-                      <p className="text-[10px] text-[#117097] dark:text-sky-400 lowercase italic font-bold mt-0.5">🌿 Bloque: {d.invernaderos?.nombre || 'General'}</p>
+                    <td className="py-2 px-3 uppercase font-bold text-slate-800 dark:text-slate-200">
+                      <p className="font-black text-slate-900 dark:text-white text-xs">{d.clientes?.nombre_completo || 'N/A'}</p>
+                      <p className="text-[9px] text-[#117097] dark:text-sky-400 lowercase italic font-bold mt-0.5">🌿 Bloque: {d.invernaderos?.nombre || 'General'}</p>
                     </td>
                     
-                    <td className="p-4">
-                      <div className="space-y-1.5">
+                    {/* ⚡ PRODUCTOS EN DOBLE COLUMNA CENTRADOS */}
+                    <td className="py-2 px-3">
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 max-w-md mx-auto">
                         {d.detalle_ventas?.map((item, i) => (
-                          <div key={i} className="flex gap-2 items-center">
-                            <p className="font-black text-slate-700 dark:text-slate-300 uppercase text-[10px] leading-none">{item.descripcion}</p>
-                            <span className="bg-green-100 dark:bg-emerald-950/80 text-green-800 dark:text-emerald-400 border border-green-200 dark:border-emerald-800 px-1.5 py-0.5 rounded-md text-[9px] font-black italic shadow-sm">
+                          <div key={i} className="flex gap-1.5 items-center justify-between bg-slate-100 dark:bg-slate-900/50 px-2 py-1 rounded border border-slate-200 dark:border-slate-700/50">
+                            <span className="font-black text-slate-700 dark:text-slate-300 uppercase text-[9px] truncate" title={item.descripcion}>{item.descripcion}</span>
+                            <span className="bg-green-100 dark:bg-emerald-950/80 text-green-800 dark:text-emerald-400 border border-green-200 dark:border-emerald-800 px-1 py-0.5 rounded text-[8px] font-black italic whitespace-nowrap">
                               {item.cantidad} {item.escala}
                             </span>
                           </div>
@@ -518,24 +520,24 @@ export default function Despachos({
                       </div>
                     </td>
                     
-                    <td className="p-4 text-right font-black text-green-800 dark:text-emerald-400 text-sm whitespace-nowrap">
+                    <td className="py-2 px-3 text-right font-black text-green-800 dark:text-emerald-400 text-xs whitespace-nowrap">
                       {formatoPesos(d.total_venta)}
                     </td>
                     
-                    <td className="p-4 text-center">
-                      <div className="flex gap-1.5 justify-center">
+                    <td className="py-2 px-3 text-center whitespace-nowrap">
+                      <div className="flex gap-1 justify-center">
                         <button 
                           onClick={() => ejecutarImpresionDespachoLocal(d)} 
-                          className="px-2.5 py-1.5 bg-slate-800 dark:bg-slate-700 text-white rounded-lg hover:bg-black dark:hover:bg-slate-600 transition-colors flex items-center gap-1 border border-slate-900 dark:border-slate-600 shadow-sm cursor-pointer"
+                          className="px-2 py-1 bg-slate-800 dark:bg-slate-700 text-white rounded-lg hover:bg-black dark:hover:bg-slate-600 transition-colors flex items-center gap-1 border border-slate-900 dark:border-slate-600 shadow-sm cursor-pointer"
                           title="Imprimir PDF"
                         >
-                          <span className="text-[11px]">🖨️</span><span className="text-[9px] font-black tracking-wider">PDF</span>
+                          <span className="text-[10px]">🖨️</span><span className="text-[8px] font-black tracking-wider">PDF</span>
                         </button>
                         
                         {userRole === 'admin' && (
                           <button 
                             onClick={() => eliminarDespacho(d.id)}
-                            className="p-1.5 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-700 hover:text-white transition-all border border-red-200 dark:border-red-900 text-xs cursor-pointer"
+                            className="p-1 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-700 hover:text-white transition-all border border-red-200 dark:border-red-900 text-[10px] cursor-pointer"
                             title="Eliminar Remisión"
                           >
                             🗑️

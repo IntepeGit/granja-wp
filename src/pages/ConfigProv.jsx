@@ -248,23 +248,23 @@ export default function ConfigProv({ provForm, setProvForm, mostrarAlerta, carga
         </div>
       </div>
 
-      {/* 📊 TABLA DE PROVEEDORES (ANCHO COMPLETO) */}
+      {/* 📊 TABLA DE PROVEEDORES COMPRIMIDA */}
       <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-700 transition-colors duration-300">
         <div className="overflow-x-auto max-h-[600px]">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-100 dark:bg-slate-700/80 text-slate-700 dark:text-slate-300 uppercase font-black text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-700 sticky top-0">
-                <th className="p-4">Nombre / Razón Social</th>
-                <th className="p-4">NIT / CC</th>
-                <th className="p-4">Datos de Pago</th>
-                <th className="p-4 text-center">Contacto / Ubicación</th>
-                <th className="p-4 text-center">Acciones</th>
+                <th className="py-2.5 px-3">Nombre / Razón Social</th>
+                <th className="py-2.5 px-3">NIT / CC</th>
+                <th className="py-2.5 px-3">Datos de Pago</th>
+                <th className="py-2.5 px-3 text-center">Contacto / Ubicación</th>
+                <th className="py-2.5 px-3 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60 font-bold text-slate-700 dark:text-slate-300">
               {proveedoresFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="p-8 text-center text-slate-400 dark:text-slate-500 font-bold italic">
+                  <td colSpan="5" className="p-6 text-center text-slate-400 dark:text-slate-500 font-bold italic">
                     No hay proveedores registrados o coincidentes con la búsqueda.
                   </td>
                 </tr>
@@ -272,17 +272,17 @@ export default function ConfigProv({ provForm, setProvForm, mostrarAlerta, carga
                 proveedoresFiltrados.map((item, index) => (
                   <tr key={item.id} className={`${index % 2 === 0 ? 'bg-white dark:bg-slate-800' : 'bg-slate-50/50 dark:bg-slate-800/60'} hover:bg-sky-50/50 dark:hover:bg-slate-700/50 transition-colors border-l-8 border-[#117097] dark:border-sky-600`}>
                     
-                    <td className="p-4 font-black text-slate-900 dark:text-white">
-                      <p className="uppercase text-sm leading-snug">{item.nombre}</p>
-                      {item.nota && <p className="text-[10px] text-slate-400 dark:text-slate-400 font-medium normal-case mt-1 line-clamp-2">📝 {item.nota}</p>}
+                    <td className="py-2 px-3 font-black text-slate-900 dark:text-white">
+                      <p className="uppercase text-xs leading-snug">{item.nombre}</p>
+                      {item.nota && <p className="text-[9px] text-slate-400 dark:text-slate-400 font-medium normal-case mt-0.5 line-clamp-2">📝 {item.nota}</p>}
                     </td>
                     
-                    <td className="p-4 font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                    <td className="py-2 px-3 font-bold text-slate-700 dark:text-slate-300 whitespace-nowrap">
                       {item.nit_cc}
                     </td>
                     
                     {/* DATOS DE PAGO */}
-                    <td className="p-4 font-bold">
+                    <td className="py-2 px-3 font-bold">
                       <span className={`inline-block px-2 py-0.5 rounded text-[8px] uppercase tracking-wider font-black shadow-sm ${
                         item.banco === 'Efectivo' 
                           ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400' 
@@ -297,25 +297,25 @@ export default function ConfigProv({ provForm, setProvForm, mostrarAlerta, carga
                         {item.banco?.toLowerCase().includes('bre-b') ? '⚡ Bre-B' : `🏦 ${item.banco || 'Efectivo'}`}
                       </span>
                       {item.numero_cuenta && (
-                        <p className="text-[10px] text-slate-600 dark:text-slate-300 mt-1.5 font-black bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-1.5 py-0.5 rounded inline-block">
+                        <p className="text-[9px] text-slate-600 dark:text-slate-300 mt-1 font-black bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-1.5 py-0.5 rounded inline-block">
                           {item.banco?.toLowerCase().includes('bre-b') ? `Llave: ${item.numero_cuenta}` : `#${item.numero_cuenta}`}
                         </p>
                       )}
                     </td>
 
                     {/* CONTACTO Y UBICACIÓN */}
-                    <td className="p-4 font-bold text-slate-600 dark:text-slate-300 space-y-1">
+                    <td className="py-2 px-3 font-bold text-slate-600 dark:text-slate-300 space-y-0.5">
                       <p className="flex items-center justify-center gap-1.5 whitespace-nowrap text-xs"><span>📞</span> {item.telefono || 'N/R'}</p>
-                      {item.email && <p className="text-[10px] text-[#117097] dark:text-sky-400 font-bold lowercase text-center truncate max-w-[150px] mx-auto" title={item.email}>✉️ {item.email}</p>}
-                      <p className="uppercase text-slate-500 dark:text-slate-400 text-[9px] text-center bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-600 w-fit mx-auto mt-1">📍 {item.ciudad || 'N/R'}</p>
+                      {item.email && <p className="text-[9px] text-[#117097] dark:text-sky-400 font-bold lowercase text-center truncate max-w-[150px] mx-auto" title={item.email}>✉️ {item.email}</p>}
+                      <p className="uppercase text-slate-500 dark:text-slate-400 text-[8px] text-center bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-600 w-fit mx-auto mt-0.5">📍 {item.ciudad || 'N/R'}</p>
                     </td>
 
-                    <td className="p-4 whitespace-nowrap">
+                    <td className="py-2 px-3 whitespace-nowrap">
                       <div className="flex gap-1.5 justify-center">
                         <button
                           type="button"
                           onClick={() => prepararEdicion(item)}
-                          className="px-2.5 py-1.5 bg-slate-700 dark:bg-slate-600 text-white hover:bg-slate-900 dark:hover:bg-slate-500 rounded-lg shadow-sm border border-slate-800 dark:border-slate-500 transition-colors text-[10px] font-black flex items-center gap-1 cursor-pointer"
+                          className="px-2 py-1 bg-slate-700 dark:bg-slate-600 text-white hover:bg-slate-900 dark:hover:bg-slate-500 rounded-lg shadow-sm border border-slate-800 dark:border-slate-500 transition-colors text-[9px] font-black flex items-center gap-1 cursor-pointer"
                           title="Editar Proveedor"
                         >
                           <span>✏️</span> EDITAR
@@ -324,7 +324,7 @@ export default function ConfigProv({ provForm, setProvForm, mostrarAlerta, carga
                         <button
                           type="button"
                           onClick={() => eliminarProveedor(item.id, item.nombre)}
-                          className="p-1.5 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 hover:bg-red-700 hover:text-white rounded-lg border border-red-200 dark:border-red-900 transition-colors cursor-pointer"
+                          className="p-1 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 hover:bg-red-700 hover:text-white rounded-lg border border-red-200 dark:border-red-900 transition-colors cursor-pointer"
                           title="Eliminar Proveedor"
                         >
                           🗑️

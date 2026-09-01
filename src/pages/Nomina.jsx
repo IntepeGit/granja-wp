@@ -6,7 +6,6 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
 export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
-  // 📅 Función helper para obtener SIEMPRE la fecha local real (evita desfase UTC después de las 7:00 pm)
   const obtenerFechaLocalHoy = () => {
     const d = new Date();
     const offset = d.getTimezoneOffset();
@@ -22,18 +21,15 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
   const [cargando, setCargando] = useState(false);
   const [subTabLiquidacion, setSubTabLiquidacion] = useState('Sábado (Jornalero)');
 
-  // 🚀 ESTADO PARA MODALES MODERNOS
-  const [modalActivo, setModalActivo] = useState(null); // 'labor', 'vale', 'trabajador'
+  const [modalActivo, setModalActivo] = useState(null); 
   const [pagoEditando, setPagoEditando] = useState(null);
   const [trabajadorDetalleEdicion, setTrabajadorDetalleEdicion] = useState(null);
 
-  // Estados dinámicos para la Liquidación Central
   const [fechasCorteQuincena, setFechasCorteQuincena] = useState({});
   const [formasPagoModificadas, setFormasPagoModificadas] = useState({});
   const [cuentasModificadas, setCuentasModificadas] = useState({});
   const [invernaderosSeleccionados, setInvernaderosSeleccionados] = useState({});
 
-  // Formularios
   const [formTrabajador, setFormTrabajador] = useState({ 
     id_editando: null, nombre_completo: '', cedula: '', telefono: '', email: '',
     pago_jornal_base: '', tipo_pago: 'Sábado (Jornalero)', fecha_registro: obtenerFechaLocalHoy(),
@@ -142,7 +138,6 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
     }
   };
 
-  // --- 👥 TRABAJADORES ---
   const registrarTrabajador = async (e) => {
     e.preventDefault();
     const payload = {
@@ -193,7 +188,6 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
 
   const limpiarFormTrabajador = () => setFormTrabajador({ id_editando: null, nombre_completo: '', cedula: '', telefono: '', email: '', pago_jornal_base: '', tipo_pago: 'Sábado (Jornalero)', fecha_registro: obtenerFechaLocalHoy(), forma_pago_predeterminada: 'Efectivo', numero_cuenta_predeterminado: '' });
   
-  // --- ⏱️ REGISTRO DE LABOR ---
   const registrarJornalDiario = async (e) => {
     e.preventDefault();
     if (!formJornal.trabajador_id || !formJornal.tipo_labor) return;
@@ -253,7 +247,6 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
     }
   };
 
-  // --- 🎟️ REGISTRO DE VALES ---
   const registrarValeAdelanto = async (e) => {
     e.preventDefault();
     const monto = parseFloat(formVale.monto_vale);
@@ -285,7 +278,6 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
     }
   };
 
-  // 🧮 PRE-LIQUIDACIÓN
   const calcularPreLiquidacion = (filtroPago) => {
     const invernaderosActivosList = listaInvernaderos || [];
 
@@ -316,7 +308,6 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
       .filter(l => l.tipo_pago === 'Quincenal (Fijo)' || l.diasTrabajados > 0 || l.totalVales > 0);
   };
 
-  // 📄 VOUCHER PDF Y PROCESAR PAGOS... 
   const generarComprobanteNominaPDF = async (item, fechaHistorica = null, fPagoHist = null, cHist = null, idPagoHistorico = null) => {
     try {
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [105, 148] });
@@ -466,7 +457,7 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
   };
 
   const resetearCicloCompleto = async () => {
-    if (window.confirm("¿Está seguro de limpiar la planilla?")) {
+    if (window.confirm("¿Está seguro de limpiar la asistencia?")) {
       if (typeof mostrarAlerta === "function") mostrarAlerta("Planilla diaria lista", "exito");
       await cargarDatosNomina();
     }
@@ -645,7 +636,6 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
           <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Gestión de asistencias, pagos, descuentos y directorio de colaboradores.</p>
         </div>
         
-        {/* BOTONERA DE ACCIONES RÁPIDAS (CONTEXTUAL SEGÚN LA PESTAÑA) */}
         <div className="flex items-center gap-2 flex-wrap justify-center xl:justify-end w-full xl:w-auto">
           {tabInterna === 'liquidacion' && (
             <button onClick={exportarNominaAExcel} className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer">
@@ -680,7 +670,7 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
       </div>
 
       {/* ------------------------------------------------------------- */}
-      {/* VISTA 1: PLANILLA DIARIA (ANCHO COMPLETO) */}
+      {/* VISTA 1: PLANILLA DIARIA */}
       {/* ------------------------------------------------------------- */}
       {tabInterna === 'planilla' && (
         <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl overflow-hidden border border-gray-200 dark:border-slate-700 transition-colors duration-300">
@@ -695,54 +685,54 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
             <table className="w-full text-left border-collapse text-[11px]">
               <thead>
                 <tr className="bg-slate-100 dark:bg-slate-700/80 text-slate-700 dark:text-slate-300 uppercase font-black border-b dark:border-slate-700 sticky top-0 z-10">
-                  <th className="p-4 text-center">Fecha</th>
-                  <th className="p-4">Operario / Colaborador</th>
-                  <th className="p-4 text-center">Invernadero / Sede</th>
-                  <th className="p-4 text-center">Tipo Registro / Labor</th>
-                  <th className="p-4">Detalle / Notas</th>
-                  <th className="p-4 text-right">Monto (COP)</th>
-                  <th className="p-4 text-center">Acciones</th>
+                  <th className="py-2.5 px-3 text-center">Fecha</th>
+                  <th className="py-2.5 px-3">Operario / Colaborador</th>
+                  <th className="py-2.5 px-3 text-center">Invernadero / Sede</th>
+                  <th className="py-2.5 px-3 text-center">Tipo Registro / Labor</th>
+                  <th className="py-2.5 px-3">Detalle / Notas</th>
+                  <th className="py-2.5 px-3 text-right">Monto (COP)</th>
+                  <th className="py-2.5 px-3 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-slate-700/60 font-bold text-slate-700 dark:text-slate-300">
                 {listaPlanillaUnificada.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="p-8 text-center text-slate-400 dark:text-slate-500 italic font-black">No hay labores ni vales cargados en la planilla esta semana</td>
+                    <td colSpan="7" className="p-6 text-center text-slate-400 dark:text-slate-500 italic font-black">No hay labores ni vales cargados en la planilla esta semana</td>
                   </tr>
                 ) : (
                   listaPlanillaUnificada.map((item, idx) => {
                     const esVale = item.tipo_registro === 'VALE';
                     return (
                       <tr key={`${item.tipo_registro}-${item.id}-${idx}`} className={`hover:bg-sky-50 dark:hover:bg-slate-700/50 transition-colors ${idx % 2 === 0 ? 'bg-white dark:bg-slate-800' : 'bg-slate-50/50 dark:bg-slate-800/60'} border-l-4 ${esVale ? 'border-rose-500' : 'border-[#117097]'}`}>
-                        <td className="p-4 text-center font-black text-slate-500 dark:text-slate-400 whitespace-nowrap">{item.fecha}</td>
-                        <td className="p-4 font-black text-slate-900 dark:text-white uppercase text-xs">{item.trabajador_nombre}</td>
-                        <td className="p-4 text-center uppercase font-bold text-[#117097] dark:text-sky-400 text-[10px]">{item.invernadero_nombre}</td>
-                        <td className="p-4 text-center whitespace-nowrap">
-                          <span className={`px-2.5 py-1 rounded-md font-black text-[9px] uppercase shadow-sm border ${
+                        <td className="py-2 px-3 text-center font-black text-slate-500 dark:text-slate-400 whitespace-nowrap">{item.fecha}</td>
+                        <td className="py-2 px-3 font-black text-slate-900 dark:text-white uppercase text-xs">{item.trabajador_nombre}</td>
+                        <td className="py-2 px-3 text-center uppercase font-bold text-[#117097] dark:text-sky-400 text-[10px]">{item.invernadero_nombre}</td>
+                        <td className="py-2 px-3 text-center whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded-md font-black text-[9px] uppercase shadow-sm border ${
                             esVale ? 'bg-rose-50 dark:bg-rose-950/80 text-rose-800 dark:text-rose-400 border-rose-200 dark:border-rose-800' : 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'
                           }`}>
                             {item.concepto_tipo}
                           </span>
                         </td>
-                        <td className="p-4 uppercase text-slate-500 dark:text-slate-400 text-[10px]">{item.detalle_nota}</td>
-                        <td className="p-4 text-right whitespace-nowrap">
+                        <td className="py-2 px-3 uppercase text-slate-500 dark:text-slate-400 text-[10px]">{item.detalle_nota}</td>
+                        <td className="py-2 px-3 text-right whitespace-nowrap">
                           {esVale ? (
-                            <span className="font-black text-rose-600 dark:text-rose-400 text-sm">-{formatoPesos(item.monto_descuento)}</span>
+                            <span className="font-black text-rose-600 dark:text-rose-400 text-xs">-{formatoPesos(item.monto_descuento)}</span>
                           ) : (
-                            <span className="font-black text-emerald-700 dark:text-emerald-400 text-sm">+{formatoPesos(item.monto_devengado)}</span>
+                            <span className="font-black text-emerald-700 dark:text-emerald-400 text-xs">+{formatoPesos(item.monto_devengado)}</span>
                           )}
                         </td>
-                        <td className="p-4 text-center whitespace-nowrap">
-                          <div className="flex gap-1.5 justify-center">
+                        <td className="py-2 px-3 text-center whitespace-nowrap">
+                          <div className="flex gap-1 justify-center">
                             {esVale ? (
                               <>
-                                <button onClick={() => prepararEdicionVale(item.objeto_original)} className="p-1.5 bg-slate-700 dark:bg-slate-600 text-white rounded-lg border border-slate-800 dark:border-slate-500 hover:bg-slate-900 dark:hover:bg-slate-500 transition-all text-[10px] cursor-pointer" title="Editar Vale">✏️</button>
-                                <button onClick={() => eliminarValePendiente(item.id)} className="p-1.5 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 rounded-lg border border-red-200 dark:border-red-900 hover:bg-red-600 hover:text-white transition-all text-[10px] cursor-pointer" title="Eliminar Vale">🗑️</button>
+                                <button onClick={() => prepararEdicionVale(item.objeto_original)} className="p-1 bg-slate-700 dark:bg-slate-600 text-white rounded-lg border border-slate-800 dark:border-slate-500 hover:bg-slate-900 dark:hover:bg-slate-500 transition-all text-[9px] cursor-pointer" title="Editar Vale">✏️</button>
+                                <button onClick={() => eliminarValePendiente(item.id)} className="p-1 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 rounded-lg border border-red-200 dark:border-red-900 hover:bg-red-600 hover:text-white transition-all text-[9px] cursor-pointer" title="Eliminar Vale">🗑️</button>
                               </>
                             ) : (
                               <>
-                                <button onClick={() => prepararEdicionJornal(item.objeto_original)} className="p-1.5 bg-slate-700 dark:bg-slate-600 text-white rounded-lg border border-slate-800 dark:border-slate-500 hover:bg-slate-900 dark:hover:bg-slate-500 transition-all text-[10px] cursor-pointer" title="Editar Labor">✏️</button>
-                                <button onClick={() => eliminarJornalPendiente(item.id)} className="p-1.5 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 rounded-lg border border-red-200 dark:border-red-900 hover:bg-red-600 hover:text-white transition-all text-[10px] cursor-pointer" title="Eliminar Labor">🗑️</button>
+                                <button onClick={() => prepararEdicionJornal(item.objeto_original)} className="p-1 bg-slate-700 dark:bg-slate-600 text-white rounded-lg border border-slate-800 dark:border-slate-500 hover:bg-slate-900 dark:hover:bg-slate-500 transition-all text-[9px] cursor-pointer" title="Editar Labor">✏️</button>
+                                <button onClick={() => eliminarJornalPendiente(item.id)} className="p-1 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 rounded-lg border border-red-200 dark:border-red-900 hover:bg-red-600 hover:text-white transition-all text-[9px] cursor-pointer" title="Eliminar Labor">🗑️</button>
                               </>
                             )}
                           </div>
@@ -758,7 +748,7 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* VISTA 2: LIQUIDACIÓN CENTRAL */}
+      {/* VISTA 2: LIQUIDACIÓN CENTRAL (FILAS COMPRIMIDAS) */}
       {/* ------------------------------------------------------------- */}
       {tabInterna === 'liquidacion' && (
         <div className="space-y-6">
@@ -791,35 +781,35 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
                 </button>
               </div>
 
-              <button onClick={resetearCicloCompleto} className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-slate-200 text-[10px] font-black uppercase rounded-xl transition-colors border border-slate-700 cursor-pointer shadow">🧹 Limpiar Planilla</button>
+              <button onClick={resetearCicloCompleto} className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-slate-200 text-[10px] font-black uppercase rounded-xl transition-colors border border-slate-700 cursor-pointer shadow">🧹 Limpiar Asistencia</button>
             </div>
 
             <div className="overflow-x-auto max-h-[500px]">
               <table className="w-full text-left border-collapse text-[11px]">
                 <thead>
                   <tr className="bg-slate-100 dark:bg-slate-700/80 text-slate-600 dark:text-slate-300 uppercase font-black text-[10px] border-b dark:border-slate-700 sticky top-0 z-10">
-                    <th className="p-4">Trabajador / Colaborador</th>
-                    <th className="p-4 text-center">Invernadero / Sede</th>
-                    <th className="p-4 text-center">Definir Fecha Corte</th>
-                    <th className="p-4 text-center w-3/12">Forma de Pago / Cuenta</th>
-                    <th className="p-4 text-right">Devengado (+)</th>
-                    <th className="p-4 text-right">Vales (-)</th>
-                    <th className="p-4 text-right">Neto a Pagar (=)</th>
-                    <th className="p-4 text-center">Acciones</th>
+                    <th className="py-2.5 px-3">Trabajador / Colaborador</th>
+                    <th className="py-2.5 px-3 text-center">Invernadero / Sede</th>
+                    <th className="py-2.5 px-3 text-center">Definir Fecha Corte</th>
+                    <th className="py-2.5 px-3 text-center w-3/12">Forma de Pago Efectiva / Cuenta</th>
+                    <th className="py-2.5 px-3 text-right">Monto Devengado (+)</th>
+                    <th className="py-2.5 px-3 text-right">Vales (-)</th>
+                    <th className="py-2.5 px-3 text-right">Neto a Pagar (=)</th>
+                    <th className="py-2.5 px-3 text-center">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-slate-700/60 font-bold text-slate-700 dark:text-slate-300">
                   {((subTabLiquidacion === 'Sábado (Jornalero)' && listaLiquidacionSabado.length === 0) || 
                     (subTabLiquidacion === 'Quincenal (Fijo)' && listaLiquidacionQuincena.length === 0)) ? (
-                    <tr><td colSpan="8" className="p-8 text-center text-slate-400 dark:text-slate-500 italic font-bold">No hay pagos pendientes de procesar.</td></tr>
+                    <tr><td colSpan="8" className="p-6 text-center text-slate-400 dark:text-slate-500 italic font-bold">No hay pagos pendientes de procesar.</td></tr>
                   ) : (
                     (subTabLiquidacion === 'Sábado (Jornalero)' ? listaLiquidacionSabado : listaLiquidacionQuincena).map((item) => (
                       <tr key={item.id} className="bg-white dark:bg-slate-800 hover:bg-sky-50 dark:hover:bg-slate-700/50 transition-colors border-l-4 border-[#117097]">
-                        <td className="p-4 font-black uppercase text-slate-900 dark:text-white whitespace-nowrap text-xs">{item.nombre}</td>
+                        <td className="py-1.5 px-3 font-black uppercase text-slate-900 dark:text-white whitespace-nowrap text-xs">{item.nombre}</td>
                         
-                        <td className="p-3 text-center">
+                        <td className="py-1 px-3 text-center">
                           <select 
-                            className="border border-slate-300 dark:border-slate-600 p-2 rounded-lg text-[9px] font-black text-[#117097] dark:text-sky-400 bg-white dark:bg-slate-900 outline-none focus:border-[#117097]"
+                            className="border border-slate-300 dark:border-slate-600 p-1.5 rounded-lg text-[9px] font-black text-[#117097] dark:text-sky-400 bg-white dark:bg-slate-900 outline-none focus:border-[#117097]"
                             value={invernaderosSeleccionados[item.id] || ''}
                             onChange={e => setInvernaderosSeleccionados({ ...invernaderosSeleccionados, [item.id]: e.target.value })}
                           >
@@ -828,12 +818,11 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
                           </select>
                         </td>
 
-                        <td className="p-3 text-center">
-                          <input type="date" className="border border-slate-300 dark:border-slate-600 p-2 rounded-lg text-center font-black text-[10px] text-[#117097] dark:text-sky-400 bg-white dark:bg-slate-900 outline-none focus:border-[#117097]" value={fechasCorteQuincena[item.id] || ''} onChange={e => setFechasCorteQuincena({ ...fechasCorteQuincena, [item.id]: e.target.value })} />
+                        <td className="py-1 px-3 text-center">
+                          <input type="date" className="border border-slate-300 dark:border-slate-600 p-1.5 rounded-lg text-center font-black text-[10px] text-[#117097] dark:text-sky-400 bg-white dark:bg-slate-900 outline-none focus:border-[#117097]" value={fechasCorteQuincena[item.id] || ''} onChange={e => setFechasCorteQuincena({ ...fechasCorteQuincena, [item.id]: e.target.value })} />
                         </td>
                         
-                        {/* ⚡ AJUSTE EN UNA SOLA LÍNEA (FORMA PAGO / CUENTA) */}
-                        <td className="p-3">
+                        <td className="py-1 px-3">
                           <div className="flex items-center gap-1.5 min-w-[220px] justify-center mx-auto">
                             <select 
                               className="w-1/2 border border-slate-300 dark:border-slate-600 p-1.5 rounded-lg text-[9px] font-black text-[#117097] dark:text-sky-400 bg-white dark:bg-slate-900 outline-none focus:border-[#117097]" 
@@ -852,16 +841,16 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
                           </div>
                         </td>
 
-                        <td className="p-4 text-right font-black text-sm text-emerald-700 dark:text-emerald-400 whitespace-nowrap">+{formatoPesos(item.totalGanado)}</td>
-                        <td className="p-4 text-right font-black text-sm text-rose-600 dark:text-rose-400 whitespace-nowrap">-{formatoPesos(item.totalVales)}</td>
-                        <td className="p-4 text-right font-black text-sm text-[#117097] dark:text-sky-400 whitespace-nowrap">{formatoPesos(item.netoPagar)}</td>
+                        <td className="py-1.5 px-3 text-right font-black text-xs text-emerald-700 dark:text-emerald-400 whitespace-nowrap">+{formatoPesos(item.totalGanado)}</td>
+                        <td className="py-1.5 px-3 text-right font-black text-xs text-rose-600 dark:text-rose-400 whitespace-nowrap">-{formatoPesos(item.totalVales)}</td>
+                        <td className="py-1.5 px-3 text-right font-black text-xs text-[#117097] dark:text-sky-400 whitespace-nowrap">{formatoPesos(item.netoPagar)}</td>
                         
-                        <td className="p-4">
-                          <div className="flex justify-center items-center gap-1.5">
-                            <button type="button" onClick={() => setTrabajadorDetalleEdicion(item)} className="p-1.5 bg-slate-700 dark:bg-slate-600 text-white rounded-lg hover:bg-slate-900 dark:hover:bg-slate-500 transition-all text-[10px] font-black cursor-pointer shadow-sm" title="Ver Registros">🔍</button>
-                            <button type="button" onClick={() => generarComprobanteNominaPDF(item)} className="p-1.5 bg-[#0a4c68] text-white rounded-lg hover:bg-black transition-all text-[10px] font-black cursor-pointer shadow-sm" title="Imprimir PDF">🖨️</button>
-                            <button type="button" onClick={() => pagarNominaTrabajador(item)} className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-[10px] font-black uppercase cursor-pointer shadow-sm">💵 Pagar</button>
-                            <button type="button" onClick={() => descartarConsolidadoTrabajador(item.id, item.nombre)} className="p-1.5 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-600 hover:text-white transition-all text-[10px] font-black border border-red-200 dark:border-red-900 cursor-pointer" title="Descartar">🗑️</button>
+                        <td className="py-1.5 px-3">
+                          <div className="flex justify-center items-center gap-1">
+                            <button type="button" onClick={() => setTrabajadorDetalleEdicion(item)} className="p-1 bg-slate-700 dark:bg-slate-600 text-white rounded-lg hover:bg-slate-900 dark:hover:bg-slate-500 transition-all text-[9px] font-black cursor-pointer shadow-sm" title="Ver Registros">🔍</button>
+                            <button type="button" onClick={() => generarComprobanteNominaPDF(item)} className="p-1 bg-[#0a4c68] text-white rounded-lg hover:bg-black transition-all text-[9px] font-black cursor-pointer shadow-sm" title="Imprimir PDF">🖨️</button>
+                            <button type="button" onClick={() => pagarNominaTrabajador(item)} className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all text-[9px] font-black uppercase cursor-pointer shadow-sm">💵 Pagar</button>
+                            <button type="button" onClick={() => descartarConsolidadoTrabajador(item.id, item.nombre)} className="p-1 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-600 hover:text-white transition-all text-[9px] border border-red-200 dark:border-red-900 cursor-pointer" title="Descartar">🗑️</button>
                           </div>
                         </td>
                       </tr>
@@ -874,21 +863,21 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
 
           <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl overflow-hidden border border-gray-200 dark:border-slate-700 transition-colors duration-300">
             <div className="p-4 bg-slate-800 dark:bg-slate-900 text-white font-black text-[11px] uppercase tracking-wider flex justify-between items-center flex-wrap gap-2">
-              <span>📚 Historial de Pagos Anteriores</span>
+              <span>📚 Historial de Periodos Liquidados Anteriormente</span>
             </div>
             <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
               <table className="w-full text-left border-collapse text-[11px]">
                 <thead>
                   <tr className="bg-slate-100 dark:bg-slate-700/80 text-slate-600 dark:text-slate-300 uppercase font-black border-b dark:border-slate-700 sticky top-0 z-10 text-[10px]">
-                    <th className="p-4 text-center">Comp. N°</th>
-                    <th className="p-4">Trabajador / Colaborador</th>
-                    <th className="p-4 text-center">Invernadero</th>
-                    <th className="p-4 text-center">Fecha Periodo</th>
-                    <th className="p-4 text-center">Medio Pago</th>
-                    <th className="p-4 text-right">Devengado (+)</th>
-                    <th className="p-4 text-right">Vales (-)</th>
-                    <th className="p-4 text-right">Neto Entregado (=)</th>
-                    <th className="p-4 text-center">Acciones</th>
+                    <th className="py-2.5 px-3 text-center">Comp. N°</th>
+                    <th className="py-2.5 px-3">Trabajador / Colaborador</th>
+                    <th className="py-2.5 px-3 text-center">Invernadero</th>
+                    <th className="py-2.5 px-3 text-center">Fecha Periodo</th>
+                    <th className="py-2.5 px-3 text-center">Forma Pago Efectiva</th>
+                    <th className="py-2.5 px-3 text-right">Devengado (+)</th>
+                    <th className="py-2.5 px-3 text-right">Vales (-)</th>
+                    <th className="py-2.5 px-3 text-right">Neto Entregado (=)</th>
+                    <th className="py-2.5 px-3 text-center">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-slate-700/60 font-bold text-slate-700 dark:text-slate-300">
@@ -896,25 +885,25 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
                     const t = trabajadores.find(trab => trab.id === p.trabajador_id);
                     return (
                       <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors border-l-4 border-slate-300 dark:border-slate-600">
-                        <td className="p-4 text-center font-black text-slate-500 dark:text-slate-400 whitespace-nowrap">NOM-{String(p.id).padStart(4, '0')}</td>
-                        <td className="p-4 font-black text-slate-900 dark:text-white uppercase whitespace-nowrap">{t?.nombre_completo}</td>
-                        <td className="p-4 text-center font-black text-[#117097] dark:text-sky-400 uppercase text-[10px]">{p.invernadero_nombre || 'GENERAL / VARIOS'}</td>
-                        <td className="p-4 text-center text-slate-600 dark:text-slate-400 whitespace-nowrap">{p.fecha_pago}</td>
-                        <td className="p-4 text-center text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px]">
-                          {p.forma_pago_efectiva || 'Efectivo'} <br/> {p.numero_cuenta_efectivo ? `(#${p.numero_cuenta_efectivo})` : ''}
+                        <td className="py-1.5 px-3 text-center font-black text-slate-500 dark:text-slate-400 whitespace-nowrap">NOM-{String(p.id).padStart(4, '0')}</td>
+                        <td className="py-1.5 px-3 font-black text-slate-900 dark:text-white uppercase whitespace-nowrap">{t?.nombre_completo}</td>
+                        <td className="py-1.5 px-3 text-center font-black text-[#117097] dark:text-sky-400 uppercase text-[10px]">{p.invernadero_nombre || 'GENERAL / VARIOS'}</td>
+                        <td className="py-1.5 px-3 text-center text-slate-600 dark:text-slate-400 whitespace-nowrap">{p.fecha_pago}</td>
+                        <td className="py-1.5 px-3 text-center text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px]">
+                          {p.forma_pago_efectiva || 'Efectivo'} {p.numero_cuenta_efectivo ? `(#${p.numero_cuenta_efectivo})` : ''}
                         </td>
-                        <td className="p-4 text-right text-emerald-700 dark:text-emerald-400 whitespace-nowrap">+{formatoPesos(p.monto_devengado)}</td>
-                        <td className="p-4 text-rose-500 dark:text-rose-400 text-right whitespace-nowrap">-{formatoPesos(p.monto_vales)}</td>
-                        <td className="p-4 text-right text-slate-900 dark:text-white font-black text-sm whitespace-nowrap">{formatoPesos(p.monto_pagado)}</td>
-                        <td className="p-4 text-center whitespace-nowrap">
-                          <div className="flex justify-center gap-1.5">
+                        <td className="py-1.5 px-3 text-right text-emerald-700 dark:text-emerald-400 whitespace-nowrap">+{formatoPesos(p.monto_devengado)}</td>
+                        <td className="py-1.5 px-3 text-rose-500 dark:text-rose-400 text-right whitespace-nowrap">-{formatoPesos(p.monto_vales)}</td>
+                        <td className="py-1.5 px-3 text-right text-slate-900 dark:text-white font-black text-xs whitespace-nowrap">{formatoPesos(p.monto_pagado)}</td>
+                        <td className="py-1.5 px-3 text-center whitespace-nowrap">
+                          <div className="flex justify-center gap-1">
                             <button 
                               type="button" 
                               onClick={() => generarComprobanteNominaPDF({ id: p.trabajador_id, nombre: t?.nombre_completo, cedula: t?.cedula, tipo_pago: subTabLiquidacion, netoPagar: p.monto_pagado, totalGanado: p.monto_devengado, totalVales: p.monto_vales, dias_respaldo: p.dias_liquidados, invernadero_nombre: p.invernadero_nombre, jornalesDetalle: p.jornalesDetalle, valesDetalle: p.valesDetalle }, p.fecha_pago, p.forma_pago_efectiva, p.numero_cuenta_efectivo, p.id)} 
-                              className="px-2.5 py-1.5 bg-slate-800 dark:bg-slate-700 text-white rounded-lg hover:bg-black dark:hover:bg-slate-600 text-[10px] font-black cursor-pointer shadow-sm" title="Reimprimir Voucher"
+                              className="px-2 py-1 bg-slate-800 dark:bg-slate-700 text-white rounded-lg hover:bg-black dark:hover:bg-slate-600 text-[9px] font-black cursor-pointer shadow-sm" title="Reimprimir Voucher"
                             >🖨️ PDF</button>
-                            <button type="button" onClick={() => setPagoEditando(p)} className="p-1.5 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg border dark:border-slate-600 hover:bg-slate-300 dark:hover:bg-slate-600 text-[10px] cursor-pointer" title="Editar Pago">✏️</button>
-                            <button type="button" onClick={() => eliminarPagoHistorico(p)} className="p-1.5 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 rounded-lg border hover:bg-red-600 hover:text-white border-red-200 dark:border-red-900 text-[10px] cursor-pointer" title="Anular Pago">🗑️</button>
+                            <button type="button" onClick={() => setPagoEditando(p)} className="p-1 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg border dark:border-slate-600 hover:bg-slate-300 dark:hover:bg-slate-600 text-[9px] cursor-pointer" title="Editar Pago">✏️</button>
+                            <button type="button" onClick={() => eliminarPagoHistorico(p)} className="p-1 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 rounded-lg border hover:bg-red-600 hover:text-white border-red-200 dark:border-red-900 text-[9px] cursor-pointer" title="Anular Pago">🗑️</button>
                           </div>
                         </td>
                       </tr>
@@ -939,51 +928,51 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
             <table className="w-full text-left border-collapse text-[11px]">
               <thead>
                 <tr className="bg-slate-100 dark:bg-slate-700/80 text-slate-700 dark:text-slate-300 uppercase font-black text-[10px] border-b dark:border-slate-700 sticky top-0">
-                  <th className="p-4">Operario / Cédula</th>
-                  <th className="p-4">Contacto</th>
-                  <th className="p-4">Forma de Pago / Cuenta</th>
-                  <th className="p-4 text-center">F. Ingreso</th>
-                  <th className="p-4 text-right">Frecuencia / Base</th>
-                  <th className="p-4 text-center">Acciones</th>
+                  <th className="py-2.5 px-3">Operario / Cédula</th>
+                  <th className="py-2.5 px-3">Contacto</th>
+                  <th className="py-2.5 px-3">Forma de Pago / Cuenta</th>
+                  <th className="py-2.5 px-3 text-center">F. Ingreso</th>
+                  <th className="py-2.5 px-3 text-right">Frecuencia / Base</th>
+                  <th className="py-2.5 px-3 text-center">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-slate-700/60 font-bold text-slate-700 dark:text-slate-300">
                 {trabajadores.length === 0 ? (
-                  <tr><td colSpan="6" className="p-8 text-center text-slate-400 italic">No hay operarios registrados</td></tr>
+                  <tr><td colSpan="6" className="p-6 text-center text-slate-400 italic">No hay operarios registrados</td></tr>
                 ) : (
                   trabajadores.map((t, idx) => (
                     <tr key={t.id} className={`${idx % 2 === 0 ? 'bg-white dark:bg-slate-800' : 'bg-slate-50/50 dark:bg-slate-800/60'} hover:bg-sky-50 dark:hover:bg-slate-700/50 transition-colors border-l-4 border-[#117097]`}>
-                      <td className="p-4 uppercase">
-                        <p className="font-black text-slate-900 dark:text-white text-sm">{t.nombre_completo}</p>
-                        <p className="text-[10px] text-gray-500 dark:text-slate-400 font-bold mt-0.5">C.C. {t.cedula || 'N/R'}</p>
+                      <td className="py-2 px-3 uppercase">
+                        <p className="font-black text-slate-900 dark:text-white text-xs">{t.nombre_completo}</p>
+                        <p className="text-[10px] text-gray-500 dark:text-slate-400 font-bold">C.C. {t.cedula || 'N/R'}</p>
                       </td>
-                      <td className="p-4">
-                        <p className="text-slate-800 dark:text-slate-200 font-black">📞 {t.telefono || 'N/R'}</p>
-                        {t.email && <p className="text-[10px] text-[#117097] dark:text-sky-400 font-bold lowercase mt-0.5">✉️ {t.email}</p>}
+                      <td className="py-2 px-3">
+                        <p className="text-slate-800 dark:text-slate-200 font-black text-[10px]">📞 {t.telefono || 'N/R'}</p>
+                        {t.email && <p className="text-[9px] text-[#117097] dark:text-sky-400 font-bold lowercase">✉️ {t.email}</p>}
                       </td>
-                      <td className="p-4">
-                        <span className="inline-block bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-[9px] px-2.5 py-1 rounded-md font-black uppercase shadow-sm">
+                      <td className="py-2 px-3">
+                        <span className="inline-block bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-[9px] px-2 py-0.5 rounded-md font-black uppercase shadow-sm">
                           💳 {t.forma_pago_predeterminada || 'Efectivo'}
                         </span>
                         {t.numero_cuenta_predeterminado && (
-                          <p className="text-[10px] text-[#117097] dark:text-sky-400 font-black mt-1">#{t.numero_cuenta_predeterminado}</p>
+                          <p className="text-[9px] text-[#117097] dark:text-sky-400 font-black mt-0.5">#{t.numero_cuenta_predeterminado}</p>
                         )}
                       </td>
-                      <td className="p-4 text-center text-slate-500 dark:text-slate-400 font-black">
+                      <td className="py-2 px-3 text-center text-slate-500 dark:text-slate-400 font-black text-[10px]">
                         {t.fecha_registro || '---'}
                       </td>
-                      <td className="p-4 text-right">
-                        <span className="block text-[9px] uppercase font-black text-slate-400">
+                      <td className="py-2 px-3 text-right">
+                        <span className="block text-[8px] uppercase font-black text-slate-400">
                           {t.tipo_pago === 'Quincenal (Fijo)' ? 'Sueldo Fijo' : 'Jornal Base'}
                         </span>
-                        <span className="font-black text-[#117097] dark:text-sky-400 text-sm mt-0.5 inline-block">
+                        <span className="font-black text-[#117097] dark:text-sky-400 text-xs inline-block">
                           {formatoPesos(t.pago_jornal_base)}
                         </span>
                       </td>
-                      <td className="p-4 text-center">
-                        <div className="flex gap-1.5 justify-center">
-                          <button onClick={() => prepararEdicionTrabajador(t)} className="p-1.5 bg-slate-700 dark:bg-slate-600 text-white rounded-lg hover:bg-slate-900 dark:hover:bg-slate-500 transition-all text-[10px] font-black shadow-sm cursor-pointer" title="Editar">✏️ EDITAR</button>
-                          <button onClick={() => eliminarTrabajadorLogico(t.id, t.nombre_completo)} className="p-1.5 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-600 hover:text-white transition-all text-[10px] border border-red-200 dark:border-red-900 cursor-pointer" title="Inactivar">🗑️</button>
+                      <td className="py-2 px-3 text-center">
+                        <div className="flex gap-1 justify-center">
+                          <button onClick={() => prepararEdicionTrabajador(t)} className="p-1 bg-slate-700 dark:bg-slate-600 text-white rounded-lg hover:bg-slate-900 dark:hover:bg-slate-500 transition-all text-[9px] font-black shadow-sm cursor-pointer" title="Editar">✏️</button>
+                          <button onClick={() => eliminarTrabajadorLogico(t.id, t.nombre_completo)} className="p-1 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-600 hover:text-white transition-all text-[9px] border border-red-200 dark:border-red-900 cursor-pointer" title="Inactivar">🗑️</button>
                         </div>
                       </td>
                     </tr>
@@ -995,11 +984,7 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
         </div>
       )}
 
-      {/* ------------------------------------------------------------- */}
-      {/* 🧊 MODALES FLOTANTES */}
-      {/* ------------------------------------------------------------- */}
-
-      {/* MODAL 1: TRABAJADOR */}
+      {/* MODALES FLOTANTES */}
       {modalActivo === 'trabajador' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
           <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 my-8 text-slate-800 dark:text-slate-200">
@@ -1068,7 +1053,6 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
         </div>
       )}
 
-      {/* MODAL 2: LABOR DIARIA */}
       {modalActivo === 'labor' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
           <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 my-8 text-slate-800 dark:text-slate-200">
@@ -1155,7 +1139,6 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
         </div>
       )}
 
-      {/* MODAL 3: VALE / DESCUENTO */}
       {modalActivo === 'vale' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
           <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 my-8 text-slate-800 dark:text-slate-200">
@@ -1194,7 +1177,6 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
         </div>
       )}
 
-      {/* MODAL 4: EDICIÓN RÁPIDA DE PAGO HISTÓRICO */}
       {pagoEditando && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
           <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 my-8 text-slate-800 dark:text-slate-200">
@@ -1224,7 +1206,6 @@ export default function Nomina({ mostrarAlerta, listaInvernaderos }) {
         </div>
       )}
 
-      {/* MODAL 5: AUDITORÍA DE REGISTROS PENDIENTES */}
       {trabajadorDetalleEdicion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
           <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 my-8 text-slate-800 dark:text-slate-200">

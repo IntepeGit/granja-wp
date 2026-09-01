@@ -379,14 +379,14 @@ export default function Gastos({
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-100 dark:bg-slate-700/80 text-slate-700 dark:text-slate-300 uppercase font-black text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-700 sticky top-0">
-                <th className="p-4">Fecha / Factura</th>
-                <th className="p-4 text-center">Invernadero</th>
-                <th className="p-4">Concepto / Categoría</th>
-                <th className="p-4 text-center">Ref / Tipo</th>
-                <th className="p-4">Proveedor / Beneficiario</th>
-                <th className="p-4 text-center">Forma de Pago</th>
-                <th className="p-4 text-right">Monto Total</th>
-                <th className="p-4 text-center">Acciones</th>
+                <th className="py-2.5 px-3">Fecha / Factura</th>
+                <th className="py-2.5 px-3 text-center">Invernadero</th>
+                <th className="py-2.5 px-3">Concepto / Categoría</th>
+                <th className="py-2.5 px-3 text-center">Ref / Tipo</th>
+                <th className="py-2.5 px-3">Proveedor / Beneficiario</th>
+                <th className="py-2.5 px-3 text-center">Forma de Pago</th>
+                <th className="py-2.5 px-3 text-right">Monto Total</th>
+                <th className="py-2.5 px-3 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60 font-bold text-slate-700 dark:text-slate-300">
@@ -399,29 +399,29 @@ export default function Gastos({
                   const nombreProveedor = g.nombre_proveedor || g.proveedores?.nombre_completo || g.proveedores?.nombre || 'Particular / Otros';
                   return (
                     <tr key={g.id} className={`${index % 2 === 0 ? 'bg-white dark:bg-slate-800' : 'bg-slate-50/50 dark:bg-slate-800/60'} hover:bg-sky-50/50 dark:hover:bg-slate-700/50 transition-colors border-l-8 border-[#117097] dark:border-sky-600`}>
-                      <td className="p-4 whitespace-nowrap">
+                      <td className="py-2 px-3 whitespace-nowrap">
                         <div className="font-black text-slate-900 dark:text-white">{limpiarFecha(g.fecha || g.fecha_gasto)}</div>
                         <div className="text-[10px] text-[#117097] dark:text-sky-400 font-black mt-0.5">{g.numero_comprobante ? `DOC: ${g.numero_comprobante.toUpperCase()}` : 'S/N'}</div>
                       </td>
-                      <td className="p-4 text-center whitespace-nowrap">
+                      <td className="py-2 px-3 text-center whitespace-nowrap">
                         <span className="bg-slate-700 text-white px-2 py-0.5 rounded text-[9px] font-black uppercase shadow-sm">
                           {g.invernaderos?.nombre || 'Gral'}
                         </span>
                       </td>
-                     <td className="p-4 font-bold text-slate-800 dark:text-slate-200 max-w-[300px] whitespace-normal break-words">
+                      <td className="py-2 px-3 font-bold text-slate-800 dark:text-slate-200 max-w-[300px] whitespace-normal break-words">
                         <p className="uppercase font-black text-slate-900 dark:text-white leading-snug">{g.descripcion}</p>
-                        <p className="text-[9px] text-[#117097] dark:text-sky-400 font-black uppercase italic mt-1">📌 {g.categoria || 'Varios'}</p>
+                        <p className="text-[9px] text-[#117097] dark:text-sky-400 font-black uppercase italic mt-0.5">📌 {g.categoria || 'Varios'}</p>
                       </td>
-                      <td className="p-4 text-center whitespace-nowrap">
-                        <span className="bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 px-2 py-1 rounded-md text-[9px] font-black uppercase shadow-sm">
+                      <td className="py-2 px-3 text-center whitespace-nowrap">
+                        <span className="bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 px-2 py-0.5 rounded-md text-[9px] font-black uppercase shadow-sm">
                           {g.referencia || 'FACTURA'}
                         </span>
                       </td>
-                      <td className="p-4 font-bold text-slate-700 dark:text-slate-300">
+                      <td className="py-2 px-3 font-bold text-slate-700 dark:text-slate-300">
                         <p className="uppercase text-xs font-black text-slate-800 dark:text-white">{nombreProveedor}</p>
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">NIT: {g.nit_cc || 'S/N'}</p>
+                        <p className="text-[9px] text-slate-400 dark:text-slate-500 font-bold">NIT: {g.nit_cc || 'S/N'}</p>
                       </td>
-                      <td className="p-4 text-center whitespace-nowrap">
+                      <td className="py-2 px-3 text-center whitespace-nowrap">
                         <span className={`inline-block px-2 py-0.5 rounded text-[8px] uppercase tracking-wider font-black shadow-sm ${
                           g.forma_pago === 'Efectivo' 
                             ? 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-400' 
@@ -436,23 +436,23 @@ export default function Gastos({
                           {g.forma_pago?.toLowerCase().includes('bre-b') ? '⚡ Bre-B' : `${g.forma_pago || 'Efectivo'}`}
                         </span>
                         {g.forma_pago !== 'Efectivo' && g.numero_cuenta && (
-                          <p className="text-[9px] text-slate-500 dark:text-slate-400 font-black tracking-tight mt-1 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded px-1.5 py-0.5 max-w-[120px] mx-auto truncate" title={g.numero_cuenta}>
+                          <p className="text-[9px] text-slate-500 dark:text-slate-400 font-black tracking-tight mt-0.5 bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded px-1.5 py-0.5 max-w-[120px] mx-auto truncate" title={g.numero_cuenta}>
                             #{g.numero_cuenta}
                           </p>
                         )}
                       </td>
-                      <td className="p-4 text-right font-black text-[#117097] dark:text-sky-400 text-sm whitespace-nowrap">
+                      <td className="py-2 px-3 text-right font-black text-[#117097] dark:text-sky-400 text-xs whitespace-nowrap">
                         {formatoPesos(g.monto)}
                       </td>
-                      <td className="p-4 whitespace-nowrap">
-                        <div className="flex gap-1.5 justify-center">
-                          <button onClick={() => prepararEdicionGasto(g)} className="px-2.5 py-1 bg-slate-700 dark:bg-slate-600 text-white rounded-lg hover:bg-slate-900 dark:hover:bg-slate-500 transition-colors flex items-center gap-1 border border-slate-800 dark:border-slate-500 shadow-md text-[9px] font-black cursor-pointer" title="Editar">
+                      <td className="py-2 px-3 whitespace-nowrap">
+                        <div className="flex gap-1 justify-center">
+                          <button onClick={() => prepararEdicionGasto(g)} className="px-2 py-1 bg-slate-700 dark:bg-slate-600 text-white rounded-lg hover:bg-slate-900 dark:hover:bg-slate-500 transition-colors flex items-center gap-1 border border-slate-800 dark:border-slate-500 shadow-md text-[9px] font-black cursor-pointer" title="Editar">
                             <span>✏️</span><span>EDITAR</span>
                           </button>
-                          <button onClick={() => imprimirGastoPDF(g)} className="px-2.5 py-1 bg-slate-800 dark:bg-slate-700 text-white rounded-lg hover:bg-black dark:hover:bg-slate-600 transition-colors flex items-center gap-1 border border-slate-900 dark:border-slate-600 shadow-md text-[9px] font-black cursor-pointer" title="Imprimir PDF">
+                          <button onClick={() => imprimirGastoPDF(g)} className="px-2 py-1 bg-slate-800 dark:bg-slate-700 text-white rounded-lg hover:bg-black dark:hover:bg-slate-600 transition-colors flex items-center gap-1 border border-slate-900 dark:border-slate-600 shadow-md text-[9px] font-black cursor-pointer" title="Imprimir PDF">
                             <span>🖨️</span><span>PDF</span>
                           </button>
-                          <button onClick={() => eliminarGasto(g.id)} className="p-1.5 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-700 hover:text-white transition-colors border border-red-200 dark:border-red-900 cursor-pointer" title="Eliminar">
+                          <button onClick={() => eliminarGasto(g.id)} className="p-1 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-700 hover:text-white transition-colors border border-red-200 dark:border-red-900 cursor-pointer" title="Eliminar">
                             🗑️
                           </button>
                         </div>

@@ -211,23 +211,23 @@ export default function ConfigCli({ cliForm, setCliForm, mostrarAlerta, cargarTo
         </div>
       </div>
 
-      {/* 📊 TABLA DE CLIENTES (ANCHO COMPLETO) */}
+      {/* 📊 TABLA DE CLIENTES COMPRIMIDA */}
       <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-700 transition-colors duration-300">
         <div className="overflow-x-auto max-h-[600px]">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-100 dark:bg-slate-700/80 text-slate-700 dark:text-slate-300 uppercase font-black text-[10px] tracking-wider border-b border-slate-200 dark:border-slate-700 sticky top-0">
-                <th className="p-4">Nombre Cliente</th>
-                <th className="p-4">NIT / Identificación</th>
-                <th className="p-4">Contacto Directo</th>
-                <th className="p-4 text-center">Ciudad</th>
-                <th className="p-4 text-center">Acciones</th>
+                <th className="py-2.5 px-3">Nombre Cliente</th>
+                <th className="py-2.5 px-3">NIT / Identificación</th>
+                <th className="py-2.5 px-3">Contacto Directo</th>
+                <th className="py-2.5 px-3 text-center">Ciudad</th>
+                <th className="py-2.5 px-3 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60 font-bold text-slate-700 dark:text-slate-300">
               {clientesFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="p-8 text-center text-slate-400 dark:text-slate-500 font-bold italic">
+                  <td colSpan="5" className="p-6 text-center text-slate-400 dark:text-slate-500 font-bold italic">
                     No hay clientes registrados o coincidentes con la búsqueda.
                   </td>
                 </tr>
@@ -239,16 +239,16 @@ export default function ConfigCli({ cliForm, setCliForm, mostrarAlerta, cargarTo
                   return (
                     <tr key={item.id} className={`${index % 2 === 0 ? 'bg-white dark:bg-slate-800' : 'bg-slate-50/50 dark:bg-slate-800/60'} hover:bg-sky-50/50 dark:hover:bg-slate-700/50 transition-colors border-l-8 border-green-700 dark:border-emerald-600`}>
                       
-                      <td className="p-4 whitespace-nowrap">
-                        <p className="uppercase text-sm font-black text-slate-900 dark:text-white">{item.nombre_completo}</p>
-                        <p className="text-[10px] text-blue-600 dark:text-sky-400 font-bold lowercase mt-0.5">{item.correo || 'Sin correo electrónico'}</p>
+                      <td className="py-2 px-3 whitespace-nowrap">
+                        <p className="uppercase text-xs font-black text-slate-900 dark:text-white">{item.nombre_completo}</p>
+                        <p className="text-[9px] text-blue-600 dark:text-sky-400 font-bold lowercase mt-0.5">{item.correo || 'Sin correo electrónico'}</p>
                       </td>
                       
-                      <td className="p-4 font-black text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                      <td className="py-2 px-3 font-black text-slate-700 dark:text-slate-300 whitespace-nowrap">
                         {item.nit_cc}
                       </td>
                       
-                      <td className="p-4 font-bold text-slate-700 dark:text-slate-300">
+                      <td className="py-2 px-3 font-bold text-slate-700 dark:text-slate-300">
                         {linkWhatsApp ? (
                           <a href={linkWhatsApp} target="_blank" rel="noopener noreferrer" className="text-emerald-700 dark:text-emerald-400 hover:text-emerald-800 transition-colors flex items-center gap-1.5 font-black">
                             <span>💬</span> {item.telefono}
@@ -257,22 +257,22 @@ export default function ConfigCli({ cliForm, setCliForm, mostrarAlerta, cargarTo
                           <span className="text-slate-400 dark:text-slate-500 flex items-center gap-1.5"><span>📞</span> N/R</span>
                         )}
                         {item.direccion && (
-                          <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase mt-1">🏠 {item.direccion}</p>
+                          <p className="text-[9px] text-slate-500 dark:text-slate-400 font-bold uppercase mt-0.5">🏠 {item.direccion}</p>
                         )}
                       </td>
 
-                      <td className="p-4 text-center whitespace-nowrap">
-                        <span className="inline-block bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-md text-[9px] font-black uppercase shadow-sm">
+                      <td className="py-2 px-3 text-center whitespace-nowrap">
+                        <span className="inline-block bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-md text-[9px] font-black uppercase shadow-sm">
                           📍 {item.ciudad || 'N/R'}
                         </span>
                       </td>
 
-                      <td className="p-4 whitespace-nowrap">
-                        <div className="flex gap-1.5 justify-center">
+                      <td className="py-2 px-3 whitespace-nowrap">
+                        <div className="flex gap-1 justify-center">
                           <button
                             type="button"
                             onClick={() => prepararEdicion(item)}
-                            className="px-2.5 py-1.5 bg-slate-700 dark:bg-slate-600 text-white hover:bg-slate-900 dark:hover:bg-slate-500 rounded-lg shadow-sm border border-slate-800 dark:border-slate-500 transition-colors text-[10px] font-black flex items-center gap-1 cursor-pointer"
+                            className="px-2 py-1 bg-slate-700 dark:bg-slate-600 text-white hover:bg-slate-900 dark:hover:bg-slate-500 rounded-lg shadow-sm border border-slate-800 dark:border-slate-500 transition-colors text-[9px] font-black flex items-center gap-1 cursor-pointer"
                             title="Editar Cliente"
                           >
                             <span>✏️</span> EDITAR
@@ -281,7 +281,7 @@ export default function ConfigCli({ cliForm, setCliForm, mostrarAlerta, cargarTo
                           <button
                             type="button"
                             onClick={() => eliminarCliente(item.id, item.nombre_completo)}
-                            className="p-1.5 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 hover:bg-red-700 hover:text-white rounded-lg border border-red-200 dark:border-red-900 transition-colors cursor-pointer"
+                            className="p-1 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400 hover:bg-red-700 hover:text-white rounded-lg border border-red-200 dark:border-red-900 transition-colors cursor-pointer"
                             title="Inactivar Cliente"
                           >
                             🗑️

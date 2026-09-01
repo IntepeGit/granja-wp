@@ -680,9 +680,9 @@ function App() {
           />
         )}
 
-        <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-green-900 dark:bg-slate-900 border-r border-transparent dark:border-slate-800 shadow-2xl transform ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static transition-transform duration-300 flex flex-col`}>
+        <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-green-900 dark:bg-slate-800 border-r border-transparent dark:border-slate-700 shadow-2xl transform ${isMenuOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static transition-transform duration-300 flex flex-col`}>
   
-            <div className="p-6 text-center border-b border-green-800 dark:border-slate-800 flex flex-col items-center justify-center gap-2">
+            <div className="p-6 text-center border-b border-green-800 dark:border-slate-700 flex flex-col items-center justify-center gap-2">
               <h2 className="text-white font-black text-2xl tracking-tighter">🚜 GRANJA WP</h2>
               
               {userRole ? (
